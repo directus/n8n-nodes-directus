@@ -1,48 +1,104 @@
-![Banner image](https://user-images.githubusercontent.com/10284570/173569848-c624317f-42b1-45a6-ab09-f0ea3c247648.png)
+# n8n-nodes-directus
 
-# n8n-nodes-starter
+A comprehensive n8n community node package for integrating with Directus CMS.
 
-This repo contains example nodes to help you get started building your own custom integrations for [n8n](https://n8n.io). It includes the node linter and other dependencies.
+[n8n](https://n8n.io/) is a [fair-code licensed](https://docs.n8n.io/reference/license/) workflow automation platform.
 
-To make your custom node available to the community, you must create it as an npm package, and [submit it to the npm registry](https://docs.npmjs.com/packages-and-modules/contributing-packages-to-the-registry).
+[Installation](#installation)  
+[Operations](#operations)  
+[Credentials](#credentials)  
+[Compatibility](#compatibility)  
+[Development](#development)  
+[Resources](#resources)
 
-If you would like your node to be available on n8n cloud you can also [submit your node for verification](https://docs.n8n.io/integrations/creating-nodes/deploy/submit-community-nodes/).
+## Installation
 
-## Prerequisites
+Follow the [installation guide](https://docs.n8n.io/integrations/community-nodes/installation/) in the n8n community nodes documentation.
 
-You need the following installed on your development machine:
+### From npm (when published)
 
-* [git](https://git-scm.com/downloads)
-* Node.js and npm. Minimum version Node 20. You can find instructions on how to install both using nvm (Node Version Manager) for Linux, Mac, and WSL [here](https://github.com/nvm-sh/nvm). For Windows users, refer to Microsoft's guide to [Install NodeJS on Windows](https://docs.microsoft.com/en-us/windows/dev-environment/javascript/nodejs-on-windows).
-* Install n8n with:
-  ```
-  npm install n8n -g
-  ```
-* Recommended: follow n8n's guide to [set up your development environment](https://docs.n8n.io/integrations/creating-nodes/build/node-development-environment/).
+```bash
+npm install n8n-nodes-directus
+```
 
-## Using this starter
+## Operations
 
-These are the basic steps for working with the starter. For detailed guidance on creating and publishing nodes, refer to the [documentation](https://docs.n8n.io/integrations/creating-nodes/).
+### Directus Node
 
-1. [Generate a new repository](https://github.com/n8n-io/n8n-nodes-starter/generate) from this template repository.
-2. Clone your new repo:
-   ```
-   git clone https://github.com/<your organization>/<your-repo-name>.git
-   ```
-3. Run `npm i` to install dependencies.
-4. Open the project in your editor.
-5. Browse the examples in `/nodes` and `/credentials`. Modify the examples, or replace them with your own nodes.
-6. Update the `package.json` to match your details.
-7. Run `npm run lint` to check for errors or `npm run lintfix` to automatically fix errors when possible.
-8. Test your node locally. Refer to [Run your node locally](https://docs.n8n.io/integrations/creating-nodes/test/run-node-locally/) for guidance.
-9. Replace this README with documentation for your node. Use the [README_TEMPLATE](README_TEMPLATE.md) to get started.
-10. Update the LICENSE file to use your details.
-11. [Publish](https://docs.npmjs.com/packages-and-modules/contributing-packages-to-the-registry) your package to npm.
+- **Items**: Create, read, update, delete items in collections
+- **Users**: Invite, update, delete users
+- **Files**: Upload, update, delete files
 
-## More information
+### Directus Trigger Node
 
-Refer to our [documentation on creating nodes](https://docs.n8n.io/integrations/creating-nodes/) for detailed information on building your own nodes.
+- **Item Events**: Created, updated, deleted
+- **User Events**: Created, updated, deleted
+- **File Events**: Uploaded
+
+## Credentials
+
+To use this integration, you'll need to configure your Directus API credentials:
+
+1. **Directus URL**: Your instance URL (e.g., `https://your-directus.app`)
+2. **Access Token**: Generate a static token in Directus → User Library → [User] → Token
+3. **Environment**: Choose "Cloud" or "Self-hosted"
+
+### Getting a Directus Access Token
+
+1. Log into your Directus admin panel
+2. Go to User Library
+3. Select a user (or create a service user)
+4. Generate a static token for that user
+5. Copy the token and use it in your n8n credentials
+
+## Compatibility
+
+- **Minimum n8n version**: 1.110.0
+- **Tested with**: n8n 1.110.0+
+- **Node.js**: >=20.15
+
+## Development
+
+### Development Setup
+
+```bash
+git clone <repository-url>
+cd n8n-directus
+npm install
+npm run build
+npm test
+```
+
+### Local Testing
+
+```bash
+# Build and start n8n with Docker
+npm run build && docker-compose up -d
+
+# Visit n8n at http://localhost:5678 (admin/admin123)
+```
+
+### Commands
+
+```bash
+npm run build    # Build nodes
+npm test         # Run tests
+npm run lint     # Check code style
+```
+
+## Resources
+
+- [n8n community nodes documentation](https://docs.n8n.io/integrations/#community-nodes)
+- [Directus Documentation](https://docs.directus.io/)
+- [Directus API Reference](https://docs.directus.io/reference/introduction/)
+
+## Contributing
+
+1. Fork and create a feature branch
+2. Make changes and add tests
+3. Ensure `npm test` passes
+4. Submit a pull request
 
 ## License
 
-[MIT](https://github.com/n8n-io/n8n-nodes-starter/blob/master/LICENSE.md)
+MIT License
