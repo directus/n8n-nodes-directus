@@ -93,7 +93,7 @@ describe('Integration Tests', () => {
 				url: 'https://test.directus.app',
 				token: 'test-token',
 			});
-			mockWebhookFunctions.helpers.request.mockResolvedValue({
+			mockWebhookFunctions.helpers.httpRequest.mockResolvedValue({
 				data: { data: { id: 'd56956bf-6ed0-465e-bb4a-ec9bde65c5f0', email: 'test@example.com' } },
 			});
 
@@ -150,7 +150,7 @@ describe('Integration Tests', () => {
 
 			// Mock flow creation
 			let capturedFlowName = '';
-			mockWebhookFunctions.helpers.request
+			mockWebhookFunctions.helpers.httpRequest
 				.mockResolvedValueOnce({ data: { data: [] } }) // cleanup flows
 				.mockImplementationOnce((options: any) => {
 					// Capture the flow name from the request body
@@ -181,7 +181,7 @@ describe('Integration Tests', () => {
 			mockWebhookFunctions.getWorkflowStaticData.mockReturnValue({});
 
 			let capturedFlowName = '';
-			mockWebhookFunctions.helpers.request
+			mockWebhookFunctions.helpers.httpRequest
 				.mockResolvedValueOnce({ data: { data: [] } })
 				.mockImplementationOnce((options: any) => {
 					capturedFlowName = options.body.name;
@@ -287,7 +287,7 @@ describe('Integration Tests', () => {
 			mockWebhookFunctions.getWorkflowStaticData.mockReturnValue({});
 
 			// Simulate API failure
-			mockWebhookFunctions.helpers.request.mockRejectedValue(new Error('Directus API Error'));
+			mockWebhookFunctions.helpers.httpRequest.mockRejectedValue(new Error('Directus API Error'));
 
 			// Should throw the error, not silently fail
 			await expect(node.webhookMethods!.default!.create.call(mockWebhookFunctions)).rejects.toThrow(

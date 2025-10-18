@@ -60,7 +60,10 @@ export function formatTitle(input: string, separator: RegExp = /\s|-|_/g): strin
 	return formattedWords.join(' ');
 }
 
-export function formatCollectionLabel(collection: any) {
+export function formatCollectionLabel(collection: {
+	collection: string;
+	meta?: { translations?: Array<{ translation: string }> };
+}) {
 	// Check if there's any translations for the collection label
 	if (collection.meta?.translations) {
 		// Get the first translation
@@ -72,7 +75,7 @@ export function formatCollectionLabel(collection: any) {
 	return formatTitle(collection.collection);
 }
 
-export function formatRoleLabel(role: any): string {
+export function formatRoleLabel(role: { name?: string; id?: string }): string {
 	if (role.name) {
 		return role.name;
 	}
@@ -84,7 +87,10 @@ export function formatRoleLabel(role: any): string {
 	return 'Role';
 }
 
-export function getItemDisplayValue(item: any, preferredFields: string[]): string {
+export function getItemDisplayValue(
+	item: Record<string, unknown>,
+	preferredFields: string[],
+): string {
 	for (const field of preferredFields) {
 		if (item[field]) return String(item[field]);
 	}
@@ -96,7 +102,10 @@ export function getItemDisplayValue(item: any, preferredFields: string[]): strin
 	return `Item ${item.id}`;
 }
 
-export function createEnhancedItemLabel(item: any, preferredFields: string[]): string {
+export function createEnhancedItemLabel(
+	item: Record<string, unknown>,
+	preferredFields: string[],
+): string {
 	const displayValue = getItemDisplayValue(item, preferredFields);
 
 	// Create a more descriptive label for users

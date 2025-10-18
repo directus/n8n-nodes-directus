@@ -8,6 +8,7 @@ import {
 	ILoadOptionsFunctions,
 	NodeApiError,
 	NodeOperationError,
+	INodeExecutionData,
 } from 'n8n-workflow';
 
 import { getCollections } from '../../src/utils/directus';
@@ -64,7 +65,7 @@ export class DirectusTrigger implements INodeType {
 				default: 'item',
 			},
 			{
-				displayName: 'Collection',
+				displayName: 'Collection Name or ID',
 				name: 'collection',
 				type: 'options',
 				typeOptions: {
@@ -77,7 +78,8 @@ export class DirectusTrigger implements INodeType {
 				},
 				default: '',
 				required: true,
-				description: 'The collection to watch for changes',
+				description:
+					'The collection to watch for changes. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 			},
 			{
 				displayName: 'Event',
@@ -124,6 +126,7 @@ export class DirectusTrigger implements INodeType {
 				description: 'The event to trigger on (only upload is supported for files)',
 			},
 		],
+		usableAsTool: true,
 	};
 
 	webhookMethods = {
@@ -137,7 +140,10 @@ export class DirectusTrigger implements INodeType {
 				}
 
 				// Flow got created before so check if it still exists
-				const credentials = (await this.getCredentials('directusApi')) as any;
+				const credentials = (await this.getCredentials('directusApi')) as {
+					url: string;
+					token: string;
+				};
 
 				// Normalize the URL to avoid double slashes
 				const baseUrl = credentials.url.replace(/\/+$/, '');
@@ -149,7 +155,7 @@ export class DirectusTrigger implements INodeType {
 
 				for (const apiUrl of urlVariants) {
 					try {
-						await this.helpers.request({
+						await this.helpers.httpRequest({
 							method: 'GET',
 							url: apiUrl,
 							headers: {
@@ -159,8 +165,8 @@ export class DirectusTrigger implements INodeType {
 
 						// If we get here, the flow exists
 						return true;
-					} catch (error: any) {
-						if (error.cause?.httpCode === '404') {
+					} catch (error: unknown) {
+						if ((error as { cause?: { httpCode?: string } })?.cause?.httpCode === '404') {
 							// Flow does not exist
 							delete webhookData.flowId;
 							return false;
@@ -197,7 +203,10 @@ export class DirectusTrigger implements INodeType {
 					// throw new NodeOperationError(this.getNode(), 'The Webhook can not work on "localhost". Please use a public URL or start n8n with "--tunnel"!');
 				}
 
-				const credentials = (await this.getCredentials('directusApi')) as any;
+				const credentials = (await this.getCredentials('directusApi')) as {
+					url: string;
+					token: string;
+				};
 				const resource = this.getNodeParameter('resource', 0) as string;
 				const event = this.getNodeParameter('event', 0) as string;
 				const collection = this.getNodeParameter('collection', 0) as string;
@@ -258,7 +267,7 @@ export class DirectusTrigger implements INodeType {
 					// Get all existing flows
 					for (const apiUrl of urlVariants) {
 						try {
-							const response = await this.helpers.request({
+							const response = await this.helpers.httpRequest({
 								method: 'GET',
 								url: apiUrl,
 								baseURL: credentials.url,
@@ -271,7 +280,7 @@ export class DirectusTrigger implements INodeType {
 							const flows = response.data.data || [];
 
 							// Find flows to clean up
-							const flowsToDelete = flows.filter((flow: any) => {
+							const flowsToDelete = flows.filter((flow: { name?: string; id: string }) => {
 								const flowName = flow.name || '';
 								// Clean up old test flows and matching production flows if we're recreating
 								if (isTestExecution) {
@@ -286,7 +295,7 @@ export class DirectusTrigger implements INodeType {
 							// Delete matching flows
 							for (const flow of flowsToDelete) {
 								try {
-									await this.helpers.request({
+									await this.helpers.httpRequest({
 										method: 'DELETE',
 										url: `${apiUrl}/${flow.id}`,
 										baseURL: credentials.url,
@@ -294,18 +303,18 @@ export class DirectusTrigger implements INodeType {
 											Authorization: `Bearer ${credentials.token}`,
 										},
 									});
-								} catch (error) {
+								} catch {
 									// Ignore cleanup errors
 								}
 							}
 
 							break; // Success, exit the loop
-						} catch (error) {
+						} catch {
 							// Try next URL variant
 							continue;
 						}
 					}
-				} catch (error) {
+				} catch {
 					// Ignore cleanup errors
 				}
 
@@ -320,12 +329,12 @@ export class DirectusTrigger implements INodeType {
 					};
 
 					let responseData;
-					let lastError;
+					let lastError: Error | undefined;
 
 					// Try to create the flow
 					for (const apiUrl of urlVariants) {
 						try {
-							responseData = await this.helpers.request({
+							responseData = await this.helpers.httpRequest({
 								method: 'POST',
 								url: apiUrl,
 								headers: {
@@ -345,18 +354,18 @@ export class DirectusTrigger implements INodeType {
 					if (!responseData) {
 						throw new NodeOperationError(
 							this.getNode(),
-							`Failed to create Directus flow ${flowConfig.name}: ${(lastError as any)?.message || 'All URL variants failed'}`,
+							`Failed to create Directus flow ${flowConfig.name}: ${(lastError as Error)?.message || 'All URL variants failed'}`,
 							{ level: 'warning' },
 						);
 					}
 
 					// Parse the response if it's a string
-					let parsedResponse: any;
+					let parsedResponse: { data?: { id: string } };
 
 					if (typeof responseData === 'string') {
 						try {
 							parsedResponse = JSON.parse(responseData);
-						} catch (parseError) {
+						} catch (parseError: unknown) {
 							throw new NodeOperationError(
 								this.getNode(),
 								`Failed to parse flow response for ${flowConfig.name}: ${parseError}`,
@@ -375,7 +384,7 @@ export class DirectusTrigger implements INodeType {
 						});
 					}
 
-					const flow = parsedResponse.data;
+					const flow = parsedResponse.data as { id: string };
 					createdFlows.push({ ...flow, webhookUrl: flowConfig.url, isTest: flowConfig.isTest });
 
 					// Track the main flow ID (production flow for persistence, or test flow if only testing)
@@ -389,7 +398,7 @@ export class DirectusTrigger implements INodeType {
 					const operationUrl = urlVariants[0].replace('/flows', `/flows/${flow.id}`);
 
 					try {
-						await this.helpers.request({
+						await this.helpers.httpRequest({
 							method: 'PATCH',
 							url: operationUrl,
 							headers: {
@@ -422,7 +431,7 @@ export class DirectusTrigger implements INodeType {
 					} catch (error) {
 						// If operation creation fails, clean up the flow
 						try {
-							await this.helpers.request({
+							await this.helpers.httpRequest({
 								method: 'DELETE',
 								url: operationUrl,
 								headers: {
@@ -435,7 +444,7 @@ export class DirectusTrigger implements INodeType {
 
 						throw new NodeOperationError(
 							this.getNode(),
-							`Failed to create webhook operation for ${flow.name}: ${(error as any).message}`,
+							`Failed to create webhook operation for flow ${flow.id}: ${(error as Error).message}`,
 							{ level: 'warning' },
 						);
 					}
@@ -459,14 +468,17 @@ export class DirectusTrigger implements INodeType {
 				// Production flow should only be deleted when the trigger node is actually removed
 
 				if (webhookData.testFlowIds && Array.isArray(webhookData.testFlowIds)) {
-					const credentials = (await this.getCredentials('directusApi')) as any;
+					const credentials = (await this.getCredentials('directusApi')) as {
+						url: string;
+						token: string;
+					};
 					const baseUrl = credentials.url.replace(/\/+$/, '');
 					const urlVariants = [`${baseUrl}/flows`, `${baseUrl}/api/flows`];
 
 					for (const testFlowId of webhookData.testFlowIds) {
 						for (const apiUrl of urlVariants) {
 							try {
-								await this.helpers.request({
+								await this.helpers.httpRequest({
 									method: 'DELETE',
 									url: `${apiUrl}/${testFlowId}`,
 									headers: {
@@ -474,7 +486,7 @@ export class DirectusTrigger implements INodeType {
 									},
 								});
 								break; // Success, move to next flow
-							} catch (error) {
+							} catch {
 								// Try next URL variant or ignore if flow already deleted
 								continue;
 							}
@@ -497,12 +509,13 @@ export class DirectusTrigger implements INodeType {
 			): Promise<Array<{ name: string; value: string }>> {
 				try {
 					const collections = await getCollections(this);
-					return collections.map((collection: any) => ({
+					return collections.map((collection: { collection: string }) => ({
 						name: collection.collection,
 						value: collection.collection,
 					}));
 				} catch (error) {
-					throw new Error(
+					throw new NodeOperationError(
+						this.getNode(),
 						`Failed to load collections: ${error instanceof Error ? error.message : String(error)}`,
 					);
 				}
@@ -517,19 +530,22 @@ export class DirectusTrigger implements INodeType {
 
 		// Extract the actual webhook payload from Directus
 		// Directus sends the payload in the body field
-		let webhookPayload: any;
+		let webhookPayload: unknown;
 
 		if (bodyData && typeof bodyData === 'object' && !Array.isArray(bodyData)) {
 			// Check if it's the Directus webhook format
-			if ((bodyData as any).event && (bodyData as any).payload) {
+			if (
+				(bodyData as { event?: string; payload?: unknown }).event &&
+				(bodyData as { event?: string; payload?: unknown }).payload
+			) {
 				webhookPayload = bodyData;
 			} else if (
-				(bodyData as any).body &&
-				(bodyData as any).body.event &&
-				(bodyData as any).body.payload
+				(bodyData as { body?: { event?: string; payload?: unknown } }).body &&
+				(bodyData as { body?: { event?: string; payload?: unknown } }).body?.event &&
+				(bodyData as { body?: { event?: string; payload?: unknown } }).body?.payload
 			) {
 				// Sometimes the payload is nested in a body field
-				webhookPayload = (bodyData as any).body;
+				webhookPayload = (bodyData as { body: { event?: string; payload?: unknown } }).body;
 			} else {
 				// Fallback to using the entire bodyData
 				webhookPayload = bodyData;
@@ -539,24 +555,27 @@ export class DirectusTrigger implements INodeType {
 		}
 
 		// Process the webhook payload
-		let workflowData: any;
+		let workflowData: { json: Record<string, unknown> };
 
 		if (resource === 'item') {
 			// Extract the item ID from various possible locations in the payload
 			let itemId =
-				webhookPayload.key ||
-				webhookPayload.id ||
-				webhookPayload.payload?.id ||
-				webhookPayload.payload?.key;
-			let completeData = webhookPayload.payload || webhookPayload;
-			const collection = webhookPayload.collection || 'unknown';
+				(webhookPayload as { key?: string })?.key ||
+				(webhookPayload as { id?: string })?.id ||
+				(webhookPayload as { payload?: { key?: string; id?: string } })?.payload?.id ||
+				(webhookPayload as { payload?: { key?: string; id?: string } })?.payload?.key;
+			let completeData = (webhookPayload as { payload?: unknown })?.payload || webhookPayload;
+			const collection = (webhookPayload as { collection?: string })?.collection || 'unknown';
 
 			// For update events, fetch complete item data to ensure we have the full item
 			if (event === 'update' && itemId) {
 				try {
-					const credentials = (await this.getCredentials('directusApi')) as any;
+					const credentials = (await this.getCredentials('directusApi')) as {
+						url: string;
+						token: string;
+					};
 
-					const response = await this.helpers.request({
+					const response = await this.helpers.httpRequest({
 						method: 'GET',
 						url: `/items/${collection}/${itemId}`,
 						baseURL: credentials.url,
@@ -568,52 +587,62 @@ export class DirectusTrigger implements INodeType {
 
 					completeData = response.data.data;
 					// Ensure we have the correct ID from the fetched data
-					itemId = completeData.id || itemId;
-				} catch (error) {
+					itemId = (completeData as { id?: string })?.id || itemId;
+				} catch {
 					// If we can't fetch complete data, use original data
 				}
 			}
 
 			// For create events, extract ID from the payload
 			if (event === 'create' && completeData) {
-				itemId = completeData.id || completeData.key || itemId;
+				itemId =
+					(completeData as { id?: string; key?: string })?.id ||
+					(completeData as { id?: string; key?: string })?.key ||
+					itemId;
 			}
 
 			// For delete events, we might only have the key/ID
 			if (event === 'delete') {
-				itemId = webhookPayload.key || webhookPayload.id || itemId;
+				itemId =
+					(webhookPayload as { key?: string; id?: string })?.key ||
+					(webhookPayload as { key?: string; id?: string })?.id ||
+					itemId;
 			}
 
 			workflowData = {
 				json: {
-					event: webhookPayload.event || `items.${event}`,
+					event: (webhookPayload as { event?: string })?.event || `items.${event}`,
 					collection: collection,
 					action: event,
 					payload: completeData,
 					// Always include the item ID for use in other operations
 					id: itemId,
 					key: String(itemId), // For backward compatibility
-					keys: webhookPayload.keys || [String(itemId)],
+					keys: (webhookPayload as { keys?: string[] })?.keys || [String(itemId)],
 					timestamp: new Date().toISOString(),
 				},
 			};
 		} else if (resource === 'user') {
 			// Extract the user ID from various possible locations in the payload
-			let completeData = webhookPayload.payload || webhookPayload;
+			let completeData = (webhookPayload as { payload?: unknown })?.payload || webhookPayload;
 			let userId =
-				webhookPayload.key ||
-				webhookPayload.id ||
-				webhookPayload.payload?.id ||
-				webhookPayload.payload?.key ||
-				completeData?.id ||
-				(webhookPayload.keys && webhookPayload.keys[0]); // For user webhooks, ID is often in keys array
+				(webhookPayload as { key?: string })?.key ||
+				(webhookPayload as { id?: string })?.id ||
+				(webhookPayload as { payload?: { key?: string; id?: string } })?.payload?.id ||
+				(webhookPayload as { payload?: { key?: string; id?: string } })?.payload?.key ||
+				(completeData as { id?: string })?.id ||
+				((webhookPayload as { keys?: string[] })?.keys &&
+					(webhookPayload as { keys?: string[] })?.keys?.[0]); // For user webhooks, ID is often in keys array
 
 			// For update events, fetch complete user data
 			if (event === 'update' && userId) {
 				try {
-					const credentials = (await this.getCredentials('directusApi')) as any;
+					const credentials = (await this.getCredentials('directusApi')) as {
+						url: string;
+						token: string;
+					};
 
-					const response = await this.helpers.request({
+					const response = await this.helpers.httpRequest({
 						method: 'GET',
 						url: `/users/${userId}`,
 						baseURL: credentials.url,
@@ -624,68 +653,78 @@ export class DirectusTrigger implements INodeType {
 					});
 
 					completeData = response.data.data;
-					userId = completeData.id || userId;
-				} catch (error) {
+					userId = (completeData as { id?: string })?.id || userId;
+				} catch {
 					// If we can't fetch complete data, use original data
 				}
 			}
 
 			// For create events, extract ID from the payload
 			if (event === 'create' && completeData) {
-				userId = completeData.id || completeData.key || userId;
+				userId =
+					(completeData as { id?: string; key?: string })?.id ||
+					(completeData as { id?: string; key?: string })?.key ||
+					userId;
 			}
 
 			// For delete events, we might only have the key/ID
 			if (event === 'delete') {
-				userId = webhookPayload.key || webhookPayload.id || userId;
+				userId =
+					(webhookPayload as { key?: string; id?: string })?.key ||
+					(webhookPayload as { key?: string; id?: string })?.id ||
+					userId;
 			}
 
 			workflowData = {
 				json: {
-					event: webhookPayload.event || `users.${event}`,
+					event: (webhookPayload as { event?: string })?.event || `users.${event}`,
 					action: event,
 					payload: completeData,
 					// Always include the user ID for use in other operations
 					id: userId,
 					key: String(userId), // For backward compatibility
-					keys: webhookPayload.keys || [String(userId)],
+					keys: (webhookPayload as { keys?: string[] })?.keys || [String(userId)],
 					timestamp: new Date().toISOString(),
 				},
 			};
 		} else if (resource === 'file') {
 			// For file webhooks, only handle upload events
 			// Extract the file ID from various possible locations in the payload
-			let completeData = webhookPayload.payload || webhookPayload;
+			const completeData = (webhookPayload as { payload?: unknown })?.payload || webhookPayload;
 			let fileId =
-				webhookPayload.key ||
-				webhookPayload.id ||
-				webhookPayload.payload?.id ||
-				webhookPayload.payload?.key ||
-				completeData?.id ||
-				(webhookPayload.keys && webhookPayload.keys[0]); // For file webhooks, ID is often in keys array
+				(webhookPayload as { key?: string })?.key ||
+				(webhookPayload as { id?: string })?.id ||
+				(webhookPayload as { payload?: { key?: string; id?: string } })?.payload?.id ||
+				(webhookPayload as { payload?: { key?: string; id?: string } })?.payload?.key ||
+				(completeData as { id?: string })?.id ||
+				((webhookPayload as { keys?: string[] })?.keys &&
+					(webhookPayload as { keys?: string[] })?.keys?.[0]); // For file webhooks, ID is often in keys array
 
 			// For upload events, the payload should contain the complete file data
 			if (event === 'upload' && completeData) {
-				fileId = completeData.id || completeData.key || fileId;
+				fileId =
+					(completeData as { id?: string; key?: string })?.id ||
+					(completeData as { id?: string; key?: string })?.key ||
+					fileId;
 			}
 
 			workflowData = {
 				json: {
-					event: webhookPayload.event || `files.${event}`,
+					event: (webhookPayload as { event?: string })?.event || `files.${event}`,
 					action: event,
 					payload: completeData,
 					// Always include the file ID for use in other operations
 					id: fileId,
 					key: String(fileId), // For backward compatibility
-					keys: webhookPayload.keys || [String(fileId)],
+					keys: (webhookPayload as { keys?: string[] })?.keys || [String(fileId)],
 					timestamp: new Date().toISOString(),
 				},
 			};
 		} else {
 			workflowData = {
 				json: {
-					...webhookPayload,
-					event: webhookPayload.event || `${resource}.${event}`,
+					...(webhookPayload as Record<string, unknown>),
+					event: (webhookPayload as { event?: string })?.event || `${resource}.${event}`,
 					timestamp: new Date().toISOString(),
 				},
 			};
@@ -695,7 +734,7 @@ export class DirectusTrigger implements INodeType {
 		if (!workflowData || !workflowData.json) {
 			workflowData = {
 				json: {
-					event: webhookPayload.event || `${resource}.${event}`,
+					event: (webhookPayload as { event?: string })?.event || `${resource}.${event}`,
 					payload: webhookPayload,
 					timestamp: new Date().toISOString(),
 					error: 'Failed to process webhook data',
@@ -713,7 +752,7 @@ export class DirectusTrigger implements INodeType {
 		// n8n expects workflowData to be an array of INodeExecutionData objects
 		// Each item should have a 'json' property containing the actual data
 		return {
-			workflowData: [[workflowData]],
+			workflowData: [[workflowData as INodeExecutionData]],
 		};
 	}
 }

@@ -22,10 +22,10 @@ export async function makeDirectusRequest(
 	urlVariants: string[],
 	options: {
 		method?: string;
-		body?: any;
+		body?: unknown;
 		headers?: Record<string, string>;
 	} = {},
-): Promise<any> {
+): Promise<unknown> {
 	const credentials = (await functions.getCredentials('directusApi')) as DirectusCredentials;
 	const baseUrl = normalizeUrl(credentials.url);
 
@@ -36,15 +36,15 @@ export async function makeDirectusRequest(
 		...headers,
 	};
 
-	let lastError: any;
+	let lastError: Error | undefined;
 
 	for (const variant of urlVariants) {
 		try {
 			const response = await functions.helpers.request({
-				method,
+				method: method as 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH',
 				url: `${baseUrl}/${variant}`,
 				headers: requestHeaders,
-				...(body && { body }),
+				...(body ? { body } : {}),
 			});
 
 			return parseDirectusResponse(response);
@@ -60,8 +60,8 @@ export async function makeDirectusRequest(
 /**
  * Parses a Directus API response, handling both string and object responses
  */
-export function parseDirectusResponse(response: any): any {
-	let parsedResponse: any;
+export function parseDirectusResponse(response: unknown): { data: unknown } {
+	let parsedResponse: unknown;
 
 	if (typeof response === 'string') {
 		try {
@@ -73,11 +73,11 @@ export function parseDirectusResponse(response: any): any {
 		parsedResponse = response;
 	}
 
-	if (!parsedResponse || !parsedResponse.data) {
+	if (!parsedResponse || typeof parsedResponse !== 'object' || !('data' in parsedResponse)) {
 		throw new Error('Invalid response format from Directus API');
 	}
 
-	return parsedResponse;
+	return parsedResponse as { data: unknown };
 }
 
 /**
@@ -85,15 +85,16 @@ export function parseDirectusResponse(response: any): any {
  */
 export async function getCollectionsFromAPI(functions: ILoadOptionsFunctions) {
 	const urlVariants = API_URL_VARIANTS.COLLECTIONS;
-	const response = await makeDirectusRequest(functions, urlVariants);
+	const response = (await makeDirectusRequest(functions, urlVariants)) as { data: unknown };
+	const responseData = response.data;
 
-	if (!Array.isArray(response.data)) {
+	if (!Array.isArray(responseData)) {
 		throw new Error(
-			`Expected array, got ${typeof response.data}. Response: ${JSON.stringify(response.data)}`,
+			`Expected array, got ${typeof responseData}. Response: ${JSON.stringify(responseData)}`,
 		);
 	}
 
-	return response.data;
+	return responseData;
 }
 
 /**
@@ -101,13 +102,14 @@ export async function getCollectionsFromAPI(functions: ILoadOptionsFunctions) {
  */
 export async function getFieldsFromAPI(functions: ILoadOptionsFunctions, collection: string) {
 	const urlVariants = API_URL_VARIANTS.FIELDS(collection);
-	const response = await makeDirectusRequest(functions, urlVariants);
+	const response = (await makeDirectusRequest(functions, urlVariants)) as { data: unknown };
+	const responseData = response.data;
 
-	if (!Array.isArray(response.data)) {
+	if (!Array.isArray(responseData)) {
 		throw new Error('Invalid response format from Directus API');
 	}
 
-	return response.data;
+	return responseData;
 }
 
 /**
@@ -115,15 +117,16 @@ export async function getFieldsFromAPI(functions: ILoadOptionsFunctions, collect
  */
 export async function getRolesFromAPI(functions: ILoadOptionsFunctions) {
 	const urlVariants = API_URL_VARIANTS.ROLES;
-	const response = await makeDirectusRequest(functions, urlVariants);
+	const response = (await makeDirectusRequest(functions, urlVariants)) as { data: unknown };
+	const responseData = response.data;
 
-	if (!Array.isArray(response.data)) {
+	if (!Array.isArray(responseData)) {
 		throw new Error(
-			`Expected array, got ${typeof response.data}. Response: ${JSON.stringify(response.data)}`,
+			`Expected array, got ${typeof responseData}. Response: ${JSON.stringify(responseData)}`,
 		);
 	}
 
-	return response.data;
+	return responseData;
 }
 
 /**
@@ -131,11 +134,12 @@ export async function getRolesFromAPI(functions: ILoadOptionsFunctions) {
  */
 export async function getRelationsFromAPI(functions: ILoadOptionsFunctions) {
 	const urlVariants = API_URL_VARIANTS.RELATIONS;
-	const response = await makeDirectusRequest(functions, urlVariants);
+	const response = (await makeDirectusRequest(functions, urlVariants)) as { data: unknown };
+	const responseData = response.data;
 
-	if (!Array.isArray(response.data)) {
+	if (!Array.isArray(responseData)) {
 		return [];
 	}
 
-	return response.data;
+	return responseData;
 }

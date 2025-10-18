@@ -270,7 +270,7 @@ describe('Directus Node', () => {
 				.mockReturnValueOnce('users') // collection
 				.mockReturnValueOnce('{"name": "Test User"}'); // jsonData
 
-			mockExecuteFunctions.helpers.request.mockResolvedValue({
+			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue({
 				data: { id: 1, name: 'Test User' },
 			});
 
@@ -293,7 +293,7 @@ describe('Directus Node', () => {
 				.mockReturnValueOnce('users') // collection
 				.mockReturnValueOnce('1'); // itemId
 
-			mockExecuteFunctions.helpers.request.mockResolvedValue({
+			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue({
 				data: { id: 1, name: 'Test User' },
 			});
 
@@ -316,7 +316,7 @@ describe('Directus Node', () => {
 				.mockReturnValueOnce('test@example.com') // email
 				.mockReturnValueOnce('1'); // role
 
-			mockExecuteFunctions.helpers.request.mockResolvedValue({
+			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue({
 				data: { id: 1, email: 'test@example.com' },
 			});
 
@@ -339,7 +339,7 @@ describe('Directus Node', () => {
 				.mockReturnValueOnce('test.txt') // filename
 				.mockReturnValueOnce('text/plain'); // mimeType
 
-			mockExecuteFunctions.helpers.request.mockResolvedValue({
+			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue({
 				data: { id: 'file-id', filename_download: 'test.txt' },
 			});
 
@@ -363,7 +363,7 @@ describe('Directus Node', () => {
 				.mockReturnValueOnce('{"name": "Test User"}'); // jsonData
 
 			mockExecuteFunctions.continueOnFail.mockReturnValue(true);
-			mockExecuteFunctions.helpers.request.mockRejectedValue(new Error('API Error'));
+			mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(new Error('API Error'));
 
 			const result = await node.execute.call(mockExecuteFunctions);
 
@@ -385,7 +385,7 @@ describe('Directus Node', () => {
 				.mockReturnValueOnce('{"name": "Test User"}'); // jsonData
 
 			mockExecuteFunctions.continueOnFail.mockReturnValue(false);
-			mockExecuteFunctions.helpers.request.mockRejectedValue(new Error('API Error'));
+			mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(new Error('API Error'));
 
 			await expect(node.execute.call(mockExecuteFunctions)).rejects.toThrow('API Error');
 		});

@@ -25,18 +25,6 @@ export const itemOperations: INodeProperties[] = [
 				action: 'Create an item with raw JSON',
 			},
 			{
-				name: 'Update',
-				value: 'update',
-				description: 'Update an existing item',
-				action: 'Update an item',
-			},
-			{
-				name: 'Update (Raw JSON)',
-				value: 'updateRaw',
-				description: 'Update an existing item using raw JSON data',
-				action: 'Update an item with raw JSON',
-			},
-			{
 				name: 'Delete',
 				value: 'delete',
 				description: 'Delete an item',
@@ -53,6 +41,18 @@ export const itemOperations: INodeProperties[] = [
 				value: 'getAll',
 				description: 'Get all items from a collection',
 				action: 'Get all items',
+			},
+			{
+				name: 'Update',
+				value: 'update',
+				description: 'Update an existing item',
+				action: 'Update an item',
+			},
+			{
+				name: 'Update (Raw JSON)',
+				value: 'updateRaw',
+				description: 'Update an existing item using raw JSON data',
+				action: 'Update an item with raw JSON',
 			},
 		],
 		default: 'create',
@@ -72,18 +72,6 @@ export const userOperations: INodeProperties[] = [
 		},
 		options: [
 			{
-				name: 'Invite User',
-				value: 'invite',
-				description: 'Invite a new user via email',
-				action: 'Invite a user',
-			},
-			{
-				name: 'Update',
-				value: 'update',
-				description: 'Update an existing user',
-				action: 'Update a user',
-			},
-			{
 				name: 'Delete',
 				value: 'delete',
 				description: 'Delete a user',
@@ -100,6 +88,18 @@ export const userOperations: INodeProperties[] = [
 				value: 'getAll',
 				description: 'Get all users',
 				action: 'Get all users',
+			},
+			{
+				name: 'Invite User',
+				value: 'invite',
+				description: 'Invite a new user via email',
+				action: 'Invite a user',
+			},
+			{
+				name: 'Update',
+				value: 'update',
+				description: 'Update an existing user',
+				action: 'Update a user',
 			},
 		],
 		default: 'invite',
@@ -119,18 +119,6 @@ export const fileOperations: INodeProperties[] = [
 		},
 		options: [
 			{
-				name: 'Upload',
-				value: 'upload',
-				description: 'Upload a new file',
-				action: 'Upload a file',
-			},
-			{
-				name: 'Update',
-				value: 'update',
-				description: 'Update file metadata',
-				action: 'Update a file',
-			},
-			{
 				name: 'Delete',
 				value: 'delete',
 				description: 'Delete a file',
@@ -148,6 +136,18 @@ export const fileOperations: INodeProperties[] = [
 				description: 'Get all files',
 				action: 'Get all files',
 			},
+			{
+				name: 'Update',
+				value: 'update',
+				description: 'Update file metadata',
+				action: 'Update a file',
+			},
+			{
+				name: 'Upload',
+				value: 'upload',
+				description: 'Upload a new file',
+				action: 'Upload a file',
+			},
 		],
 		default: 'upload',
 	},
@@ -155,7 +155,7 @@ export const fileOperations: INodeProperties[] = [
 
 export const itemFields: INodeProperties[] = [
 	{
-		displayName: 'Collection',
+		displayName: 'Collection Name or ID',
 		name: 'collection',
 		type: 'options',
 		typeOptions: {
@@ -168,7 +168,8 @@ export const itemFields: INodeProperties[] = [
 		},
 		default: '',
 		required: true,
-		description: 'The collection to operate on',
+		description:
+			'The collection to operate on. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 	},
 	{
 		displayName: 'Item ID',
@@ -211,7 +212,7 @@ export const itemFields: INodeProperties[] = [
 						displayName: 'Field',
 						values: [
 							{
-								displayName: 'Field Name',
+								displayName: 'Field Name or ID',
 								name: 'name',
 								type: 'options',
 								typeOptions: {
@@ -219,7 +220,7 @@ export const itemFields: INodeProperties[] = [
 								},
 								default: '',
 								description:
-									'Select a field from the collection. Field descriptions and required status are shown in the dropdown',
+									'Select a field from the collection. Field descriptions and required status are shown in the dropdown. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 								required: true,
 							},
 							{
@@ -227,8 +228,7 @@ export const itemFields: INodeProperties[] = [
 								name: 'value',
 								type: 'string',
 								default: '',
-								description: 'Enter the value for this field. Required fields are marked with *',
-								required: false,
+								description: 'Enter the value for this field. Required fields are marked with *.',
 							},
 						],
 					},
@@ -270,6 +270,7 @@ export const userFields: INodeProperties[] = [
 		displayName: 'Email',
 		name: 'email',
 		type: 'string',
+		placeholder: 'e.g. name@email.com',
 		default: '',
 		displayOptions: {
 			show: {
@@ -281,7 +282,7 @@ export const userFields: INodeProperties[] = [
 		description: 'User email address - they will receive an invite email at this address',
 	},
 	{
-		displayName: 'Role',
+		displayName: 'Role Name or ID',
 		name: 'role',
 		type: 'options',
 		typeOptions: {
@@ -294,8 +295,8 @@ export const userFields: INodeProperties[] = [
 			},
 		},
 		default: '',
-		required: false,
-		description: 'User role - if not provided, the default role will be assigned',
+		description:
+			'User role - if not provided, the default role will be assigned. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 	},
 	{
 		displayName: 'Custom Invite URL',
@@ -308,7 +309,6 @@ export const userFields: INodeProperties[] = [
 				operation: ['invite'],
 			},
 		},
-		required: false,
 		description:
 			'Optional custom URL for the invite link. If not provided, the default Directus invite URL will be used. Must be configured in USER_INVITE_URL_ALLOW_LIST environment variable.',
 	},
@@ -339,7 +339,7 @@ export const userFields: INodeProperties[] = [
 						displayName: 'Field',
 						values: [
 							{
-								displayName: 'Field Name',
+								displayName: 'Field Name or ID',
 								name: 'name',
 								type: 'options',
 								typeOptions: {
@@ -347,7 +347,7 @@ export const userFields: INodeProperties[] = [
 								},
 								default: '',
 								description:
-									'Select a user field to update. Field descriptions and required status are shown in the dropdown',
+									'Select a user field to update. Field descriptions and required status are shown in the dropdown. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 								required: true,
 							},
 							{
@@ -355,8 +355,7 @@ export const userFields: INodeProperties[] = [
 								name: 'value',
 								type: 'string',
 								default: '',
-								description: 'Enter the value for this field. Required fields are marked with *',
-								required: false,
+								description: 'Enter the value for this field. Required fields are marked with *.',
 							},
 						],
 					},
@@ -406,7 +405,6 @@ export const fileFields: INodeProperties[] = [
 			},
 		},
 		default: '',
-		required: false,
 		description: 'Title for the uploaded file',
 	},
 	{
@@ -420,7 +418,6 @@ export const fileFields: INodeProperties[] = [
 			},
 		},
 		default: '',
-		required: false,
 		description: 'Description for the uploaded file',
 	},
 	{
@@ -434,7 +431,6 @@ export const fileFields: INodeProperties[] = [
 			},
 		},
 		default: '',
-		required: false,
 		description: 'Folder ID to upload the file to',
 	},
 	{
@@ -464,7 +460,7 @@ export const fileFields: INodeProperties[] = [
 						displayName: 'Field',
 						values: [
 							{
-								displayName: 'Field Name',
+								displayName: 'Field Name or ID',
 								name: 'name',
 								type: 'options',
 								typeOptions: {
@@ -472,7 +468,7 @@ export const fileFields: INodeProperties[] = [
 								},
 								default: '',
 								description:
-									'Select a file field to update. Field descriptions and required status are shown in the dropdown',
+									'Select a file field to update. Field descriptions and required status are shown in the dropdown. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 								required: true,
 							},
 							{
@@ -480,8 +476,7 @@ export const fileFields: INodeProperties[] = [
 								name: 'value',
 								type: 'string',
 								default: '',
-								description: 'Enter the value for this field. Required fields are marked with *',
-								required: false,
+								description: 'Enter the value for this field. Required fields are marked with *.',
 							},
 						],
 					},
@@ -503,7 +498,7 @@ export const sharedFields: INodeProperties[] = [
 			},
 		},
 		default: false,
-		description: 'Whether to return all results or only a limited set',
+		description: 'Whether to return all results or only up to a given limit',
 	},
 	{
 		displayName: 'Limit',
@@ -522,6 +517,20 @@ export const sharedFields: INodeProperties[] = [
 		},
 		default: 50,
 		description: 'Max number of results to return',
+	},
+	{
+		displayName: 'Simplify',
+		name: 'simplify',
+		type: 'boolean',
+		displayOptions: {
+			show: {
+				resource: ['user', 'file'],
+				operation: ['getAll'],
+			},
+		},
+		default: false,
+		description:
+			'Whether to return a simplified version of the response with only essential fields',
 	},
 ];
 

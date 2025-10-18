@@ -9,12 +9,12 @@ export interface Field {
 		note?: string;
 		options?: {
 			choices?: Array<{ text: string; value: string }>;
-			[key: string]: any;
+			[key: string]: unknown;
 		};
 		interface?: string;
 		locked?: boolean;
 		hidden?: boolean;
-		translations?: Array<{ translation: string; [key: string]: any }>;
+		translations?: Array<{ translation: string; [key: string]: unknown }>;
 		display_name?: string;
 	};
 	schema?: {
@@ -24,9 +24,9 @@ export interface Field {
 
 export interface Collection {
 	collection: string;
-	schema?: any;
+	schema?: unknown;
 	meta?: {
-		translations?: Array<{ translation: string; [key: string]: any }>;
+		translations?: Array<{ translation: string; [key: string]: unknown }>;
 		display_template?: string;
 	};
 }
@@ -51,7 +51,15 @@ export { createEnhancedItemLabel, FALLBACK_DISPLAY_FIELDS };
 export type { DirectusCredentials };
 
 // Cache for relations to avoid repeated API calls
-export const relationCache = new Map<string, any[]>();
+export const relationCache = new Map<
+	string,
+	Array<{
+		many_collection?: string;
+		one_collection?: string;
+		many_field?: string;
+		one_field?: string;
+	}>
+>();
 
 interface RelationshipInfo {
 	type: string;
@@ -75,7 +83,14 @@ export function isRelationshipField(field: Field): boolean {
 export async function getCollectionRelations(
 	functions: ILoadOptionsFunctions,
 	collection: string,
-): Promise<any[]> {
+): Promise<
+	Array<{
+		many_collection?: string;
+		one_collection?: string;
+		many_field?: string;
+		one_field?: string;
+	}>
+> {
 	const credentials = (await functions.getCredentials('directusApi')) as DirectusCredentials;
 	const cacheKey = `${credentials.url}:${collection}`;
 
@@ -88,7 +103,7 @@ export async function getCollectionRelations(
 
 		// Filter relations for this specific collection
 		const collectionRelations = allRelations.filter(
-			(relation: any) =>
+			(relation: { many_collection?: string; one_collection?: string }) =>
 				relation.many_collection === collection || relation.one_collection === collection,
 		);
 
@@ -100,14 +115,27 @@ export async function getCollectionRelations(
 }
 
 // Get relationship information for a specific field
-export function getFieldRelationshipInfo(field: Field, relations: any[]): RelationshipInfo | null {
+export function getFieldRelationshipInfo(
+	field: Field,
+	relations: Array<{
+		many_collection?: string;
+		one_collection?: string;
+		many_field?: string;
+		one_field?: string;
+	}>,
+): RelationshipInfo | null {
 	if (!field || !field.field || !relations || !Array.isArray(relations)) {
 		return null;
 	}
 
 	// Find the relation where this field is either the many_field or one_field
 	const fieldRelation = relations.find(
-		(relation: any) =>
+		(relation: {
+			many_collection?: string;
+			one_collection?: string;
+			many_field?: string;
+			one_field?: string;
+		}) =>
 			(relation.many_field === field.field && relation.many_collection === field.collection) ||
 			(relation.one_field === field.field && relation.one_collection === field.collection),
 	);
@@ -124,7 +152,7 @@ export function getFieldRelationshipInfo(field: Field, relations: any[]): Relati
 		// This field is the "many" side - M2O relationship
 		return {
 			type: 'm2o',
-			relatedCollection: fieldRelation.one_collection,
+			relatedCollection: fieldRelation.one_collection || '',
 			isMultiSelect: false,
 		};
 	} else if (
@@ -134,7 +162,7 @@ export function getFieldRelationshipInfo(field: Field, relations: any[]): Relati
 		// This field is the "one" side - O2M relationship
 		return {
 			type: 'o2m',
-			relatedCollection: fieldRelation.many_collection,
+			relatedCollection: fieldRelation.many_collection || '',
 			isMultiSelect: true,
 		};
 	}
@@ -153,11 +181,11 @@ export function shouldSkipField(field: Field): boolean {
 		return true;
 	}
 
-	if ((field.meta as any)?.locked) {
+	if ((field.meta as { locked?: boolean })?.locked) {
 		return true;
 	}
 
-	if ((field.meta as any)?.hidden) {
+	if ((field.meta as { hidden?: boolean })?.hidden) {
 		return true;
 	}
 
@@ -165,7 +193,17 @@ export function shouldSkipField(field: Field): boolean {
 }
 
 // Create base n8n field
-export function createBaseN8nField(field: Field, isCreate = false): any {
+export function createBaseN8nField(
+	field: Field,
+	isCreate = false,
+): {
+	name: string;
+	displayName: string;
+	type: string;
+	default: string;
+	description: string;
+	required: boolean;
+} {
 	// Only mark as required during create operations
 	const isRequired = isCreate && (field.meta?.required ?? false);
 	const displayName = formatTitleUtil(field.field);
@@ -181,7 +219,21 @@ export function createBaseN8nField(field: Field, isCreate = false): any {
 }
 
 // Create file field
-export function createFileField(n8nField: any): any {
+export function createFileField(n8nField: {
+	name: string;
+	displayName: string;
+	type: string;
+	default: string;
+	description: string;
+	required: boolean;
+}): {
+	name: string;
+	displayName: string;
+	type: string;
+	default: string;
+	description: string;
+	required: boolean;
+} {
 	return {
 		...n8nField,
 		type: 'string',
@@ -247,7 +299,18 @@ export function getN8nFieldType(field: Field): string {
 }
 
 // Convert a Directus field to a n8n field configuration
-export function convertDirectusFieldToN8n(field: Field, isCreate = false): any | null {
+export function convertDirectusFieldToN8n(
+	field: Field,
+	isCreate = false,
+): {
+	name: string;
+	displayName: string;
+	type: string;
+	default: string;
+	description: string;
+	required: boolean;
+	options?: Array<{ name: string; value: string }>;
+} | null {
 	if (shouldSkipField(field)) {
 		return null;
 	}
@@ -260,7 +323,7 @@ export function convertDirectusFieldToN8n(field: Field, isCreate = false): any |
 			...n8nField,
 			type: 'options',
 			options: field.meta.options.choices.reduce(
-				(acc: Array<{ name: string; value: string }>, option: any) => {
+				(acc: Array<{ name: string; value: string }>, option: { text: string; value: string }) => {
 					acc.push({ name: option.text, value: option.value });
 					return acc;
 				},
@@ -355,12 +418,27 @@ export async function convertCollectionFieldsToN8n(
 	functions: ILoadOptionsFunctions,
 	collection: string,
 	isCreate = false,
-): Promise<any[]> {
+): Promise<
+	Array<{
+		name: string;
+		displayName: string;
+		type: string;
+		default: string;
+		description: string;
+		required: boolean;
+		options?: Array<{ name: string; value: string }>;
+	}>
+> {
 	const fields = await getFields(functions, collection, isCreate);
 
 	// Only fetch relations if we have relationship fields
 	const hasRelationshipFields = fields.some(isRelationshipField);
-	let relations: any[] = [];
+	let relations: Array<{
+		many_collection?: string;
+		one_collection?: string;
+		many_field?: string;
+		one_field?: string;
+	}> = [];
 
 	if (hasRelationshipFields) {
 		relations = await getCollectionRelations(functions, collection);
@@ -397,10 +475,18 @@ export async function convertCollectionFieldsToN8n(
 		return convertDirectusFieldToN8n(field, isCreate);
 	});
 
-	return convertedFields.filter(Boolean) as any[];
+	return convertedFields.filter(Boolean) as Array<{
+		name: string;
+		displayName: string;
+		type: string;
+		default: string;
+		description: string;
+		required: boolean;
+		options?: Array<{ name: string; value: string }>;
+	}>;
 }
 
-export function processFieldValue(value: any): any {
+export function processFieldValue(value: unknown): unknown {
 	if (value === undefined || value === null) {
 		return value;
 	}
@@ -437,14 +523,27 @@ export function processFieldValue(value: any): any {
 	return String(value);
 }
 
-export function formatDirectusError(error: any): string {
-	if (error.response?.data?.errors && Array.isArray(error.response.data.errors)) {
-		return error.response.data.errors.map((e: any) => e.message || e).join(', ');
+export function formatDirectusError(error: unknown): string {
+	const errorObj = error as {
+		response?: {
+			data?: {
+				errors?: Array<{ message?: string }>;
+				message?: string;
+			};
+		};
+		message?: string;
+		errors?: Array<{ message?: string }>;
+	};
+
+	if (errorObj.response?.data?.errors && Array.isArray(errorObj.response.data.errors)) {
+		return errorObj.response.data.errors
+			.map((e: { message?: string }) => e.message || e)
+			.join(', ');
 	}
 
-	if (error.response?.data?.message) return error.response.data.message;
-	if (error.message) return error.message;
-	if (error.errors && Array.isArray(error.errors))
-		return error.errors.map((e: any) => e.message).join(', ');
+	if (errorObj.response?.data?.message) return errorObj.response.data.message;
+	if (errorObj.message) return errorObj.message;
+	if (errorObj.errors && Array.isArray(errorObj.errors))
+		return errorObj.errors.map((e: { message?: string }) => e.message).join(', ');
 	return 'An unknown error occurred';
 }

@@ -21,6 +21,12 @@ export function createMockExecuteFunctions(
 		}),
 		helpers: {
 			request: jest.fn().mockResolvedValue({ data: { data: [] } }),
+			httpRequest: jest.fn().mockResolvedValue({
+				data: {
+					data: [{ id: 1, name: 'Test User' }],
+					id: 'flow-id-123',
+				},
+			}),
 			requestWithAuthentication: jest.fn().mockResolvedValue({ data: { data: [] } }),
 		},
 		continueOnFail: jest.fn(() => false),
@@ -57,6 +63,12 @@ export function createMockWebhookFunctions(
 		}),
 		helpers: {
 			request: jest.fn().mockResolvedValue({ data: { data: [] } }),
+			httpRequest: jest.fn().mockResolvedValue({
+				data: {
+					data: [{ id: 1, name: 'Test User' }],
+					id: 'flow-id-123',
+				},
+			}),
 		},
 		getCredentials: jest.fn().mockResolvedValue({}),
 		getWorkflowStaticData: jest.fn(() => ({ flowId: undefined })),

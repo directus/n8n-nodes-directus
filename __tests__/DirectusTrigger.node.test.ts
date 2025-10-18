@@ -57,7 +57,7 @@ describe('DirectusTrigger Node', () => {
 					url: 'https://test.directus.app',
 					token: 'test-token',
 				});
-				mockWebhookFunctions.helpers.request.mockResolvedValue({
+				mockWebhookFunctions.helpers.httpRequest.mockResolvedValue({
 					data: { id: 'existing-flow-id' },
 				});
 
@@ -84,7 +84,7 @@ describe('DirectusTrigger Node', () => {
 					url: 'https://test.directus.app',
 					token: 'test-token',
 				});
-				mockWebhookFunctions.helpers.request.mockRejectedValue(new Error('API Error'));
+				mockWebhookFunctions.helpers.httpRequest.mockRejectedValue(new Error('API Error'));
 
 				const result = await node.webhookMethods!.default!.checkExists.call(mockWebhookFunctions);
 
@@ -107,7 +107,7 @@ describe('DirectusTrigger Node', () => {
 				mockWebhookFunctions.getWorkflowStaticData.mockReturnValue(staticData);
 
 				// Mock successful flow creation response
-				mockWebhookFunctions.helpers.request
+				mockWebhookFunctions.helpers.httpRequest
 					.mockResolvedValueOnce({ data: { data: [] } }) // cleanup flows
 					.mockResolvedValueOnce({ data: { id: 'flow-id' } }) // create flow
 					.mockResolvedValueOnce({}); // create operation
@@ -129,7 +129,7 @@ describe('DirectusTrigger Node', () => {
 				});
 				const staticData = {};
 				mockWebhookFunctions.getWorkflowStaticData.mockReturnValue(staticData);
-				mockWebhookFunctions.helpers.request.mockRejectedValue(new Error('API Error'));
+				mockWebhookFunctions.helpers.httpRequest.mockRejectedValue(new Error('API Error'));
 
 				await expect(
 					node.webhookMethods!.default!.create.call(mockWebhookFunctions),
@@ -145,7 +145,7 @@ describe('DirectusTrigger Node', () => {
 					url: 'https://test.directus.app',
 					token: 'test-token',
 				});
-				mockWebhookFunctions.helpers.request.mockResolvedValue({});
+				mockWebhookFunctions.helpers.httpRequest.mockResolvedValue({});
 
 				const result = await node.webhookMethods!.default!.delete.call(mockWebhookFunctions);
 
@@ -159,7 +159,7 @@ describe('DirectusTrigger Node', () => {
 					url: 'https://test.directus.app',
 					token: 'test-token',
 				});
-				mockWebhookFunctions.helpers.request.mockRejectedValue(new Error('API Error'));
+				mockWebhookFunctions.helpers.httpRequest.mockRejectedValue(new Error('API Error'));
 
 				const result = await node.webhookMethods!.default!.delete.call(mockWebhookFunctions);
 
@@ -219,7 +219,7 @@ describe('DirectusTrigger Node', () => {
 				url: 'https://test.directus.app',
 				token: 'test-token',
 			});
-			mockWebhookFunctions.helpers.request.mockResolvedValue({
+			mockWebhookFunctions.helpers.httpRequest.mockResolvedValue({
 				data: { data: { id: 1, email: 'test@example.com' } },
 			});
 
@@ -259,7 +259,7 @@ describe('DirectusTrigger Node', () => {
 				url: 'https://test.directus.app',
 				token: 'test-token',
 			});
-			mockWebhookFunctions.helpers.request.mockResolvedValue({
+			mockWebhookFunctions.helpers.httpRequest.mockResolvedValue({
 				data: { data: { id: 'd56956bf-6ed0-465e-bb4a-ec9bde65c5f0', email: 'test@example.com' } },
 			});
 
@@ -397,7 +397,7 @@ describe('DirectusTrigger Node', () => {
 				.mockReturnValueOnce('update'); // event
 
 			// Mock the complete data fetch
-			mockWebhookFunctions.helpers.request.mockResolvedValue({
+			mockWebhookFunctions.helpers.httpRequest.mockResolvedValue({
 				data: { data: { id: 1, name: 'Updated Item', email: 'test@example.com' } },
 			});
 
@@ -424,7 +424,7 @@ describe('DirectusTrigger Node', () => {
 				.mockReturnValueOnce('update'); // event
 
 			// Mock the complete data fetch to fail
-			mockWebhookFunctions.helpers.request.mockRejectedValue(new Error('API Error'));
+			mockWebhookFunctions.helpers.httpRequest.mockRejectedValue(new Error('API Error'));
 
 			const result = await node.webhook.call(mockWebhookFunctions);
 

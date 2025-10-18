@@ -5,6 +5,8 @@ import {
 	INodeTypeDescription,
 	NodeOperationError,
 	ILoadOptionsFunctions,
+	IHttpRequestOptions,
+	IDataObject,
 } from 'n8n-workflow';
 
 import {
@@ -31,6 +33,7 @@ export class Directus implements INodeType {
 		},
 		inputs: ['main'],
 		outputs: ['main'],
+		usableAsTool: true,
 		credentials: [
 			{
 				name: 'directusApi',
@@ -52,7 +55,8 @@ export class Directus implements INodeType {
 						value: collection.collection,
 					}));
 				} catch (error) {
-					throw new Error(
+					throw new NodeOperationError(
+						this.getNode(),
 						`Failed to load collections: ${error instanceof Error ? error.message : String(error)}`,
 					);
 				}
@@ -66,7 +70,7 @@ export class Directus implements INodeType {
 					const isCreate = operation === 'create';
 
 					if (!collection) {
-						throw new Error('Collection parameter is required');
+						throw new NodeOperationError(this.getNode(), 'Collection parameter is required');
 					}
 
 					const fields = await convertCollectionFieldsToN8n(this, collection, isCreate);
@@ -76,7 +80,8 @@ export class Directus implements INodeType {
 						description: field.description || '',
 					}));
 				} catch (error) {
-					throw new Error(
+					throw new NodeOperationError(
+						this.getNode(),
 						`Failed to load fields: ${error instanceof Error ? error.message : String(error)}`,
 					);
 				}
@@ -84,12 +89,13 @@ export class Directus implements INodeType {
 			async getRoles(this: ILoadOptionsFunctions): Promise<Array<{ name: string; value: string }>> {
 				try {
 					const roles = await getRolesFromAPI(this);
-					return roles.map((role: any) => ({
+					return roles.map((role: { name?: string; id: string }) => ({
 						name: role.name || role.id,
 						value: role.id,
 					}));
 				} catch (error) {
-					throw new Error(
+					throw new NodeOperationError(
+						this.getNode(),
 						`Failed to load roles: ${error instanceof Error ? error.message : String(error)}`,
 					);
 				}
@@ -99,54 +105,74 @@ export class Directus implements INodeType {
 			): Promise<Array<{ name: string; value: string }>> {
 				try {
 					const fields = await getFieldsFromAPI(this, 'directus_users');
-					const editableFields = fields.filter((field: any) => {
-						if (!field || !field.meta) {
-							return false;
-						}
+					const editableFields = fields.filter(
+						(field: {
+							field: string;
+							type?: string;
+							meta?: {
+								special?: string[];
+								locked?: boolean;
+								hidden?: boolean;
+								required?: boolean;
+								note?: string;
+								display_name?: string;
+								type?: string;
+							};
+						}) => {
+							if (!field || !field.meta) {
+								return false;
+							}
 
-						const special = field.meta?.special || [];
+							const special = field.meta?.special || [];
 
-						if (special.includes('m2a')) {
-							return false;
-						}
+							if (special.includes('m2a')) {
+								return false;
+							}
 
-						if (field.meta?.locked) {
-							return false;
-						}
+							if (field.meta?.locked) {
+								return false;
+							}
 
-						if (field.meta?.hidden) {
-							return false;
-						}
+							if (field.meta?.hidden) {
+								return false;
+							}
 
-						if (field.type === 'alias') {
-							return false;
-						}
+							if (field.type === 'alias') {
+								return false;
+							}
 
-						if (field.field.startsWith('$')) {
-							return false;
-						}
+							if (field.field.startsWith('$')) {
+								return false;
+							}
 
-						if (SYSTEM_FIELDS.USER_SENSITIVE.includes(field.field)) {
-							return false;
-						}
+							if (SYSTEM_FIELDS.USER_SENSITIVE.includes(field.field)) {
+								return false;
+							}
 
-						return true;
-					});
+							return true;
+						},
+					);
 
-					return editableFields.map((field: any) => {
-						const displayName =
-							field.meta?.display_name ||
-							field.field.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase());
-						const isRequired = field.meta?.required ?? false;
+					return editableFields.map(
+						(field: {
+							field: string;
+							meta?: { display_name?: string; required?: boolean; note?: string; type?: string };
+						}) => {
+							const displayName =
+								field.meta?.display_name ||
+								field.field.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase());
+							const isRequired = field.meta?.required ?? false;
 
-						return {
-							name: isRequired ? `${displayName} *` : displayName,
-							value: field.field,
-							description: field.meta?.note || '',
-						};
-					});
+							return {
+								name: isRequired ? `${displayName} *` : displayName,
+								value: field.field,
+								description: field.meta?.note || '',
+							};
+						},
+					);
 				} catch (error) {
-					throw new Error(
+					throw new NodeOperationError(
+						this.getNode(),
 						`Failed to load user fields: ${error instanceof Error ? error.message : String(error)}`,
 					);
 				}
@@ -156,54 +182,74 @@ export class Directus implements INodeType {
 			): Promise<Array<{ name: string; value: string }>> {
 				try {
 					const fields = await getFieldsFromAPI(this, 'directus_files');
-					const editableFields = fields.filter((field: any) => {
-						if (!field || !field.meta) {
-							return false;
-						}
+					const editableFields = fields.filter(
+						(field: {
+							field: string;
+							type?: string;
+							meta?: {
+								special?: string[];
+								locked?: boolean;
+								hidden?: boolean;
+								required?: boolean;
+								note?: string;
+								display_name?: string;
+								type?: string;
+							};
+						}) => {
+							if (!field || !field.meta) {
+								return false;
+							}
 
-						const special = field.meta?.special || [];
+							const special = field.meta?.special || [];
 
-						if (special.includes('m2a')) {
-							return false;
-						}
+							if (special.includes('m2a')) {
+								return false;
+							}
 
-						if (field.meta?.locked) {
-							return false;
-						}
+							if (field.meta?.locked) {
+								return false;
+							}
 
-						if (field.meta?.hidden) {
-							return false;
-						}
+							if (field.meta?.hidden) {
+								return false;
+							}
 
-						if (field.type === 'alias') {
-							return false;
-						}
+							if (field.type === 'alias') {
+								return false;
+							}
 
-						if (field.field.startsWith('$')) {
-							return false;
-						}
+							if (field.field.startsWith('$')) {
+								return false;
+							}
 
-						if (SYSTEM_FIELDS.FILE_SENSITIVE.includes(field.field)) {
-							return false;
-						}
+							if (SYSTEM_FIELDS.FILE_SENSITIVE.includes(field.field)) {
+								return false;
+							}
 
-						return true;
-					});
+							return true;
+						},
+					);
 
-					return editableFields.map((field: any) => {
-						const displayName =
-							field.meta?.display_name ||
-							field.field.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase());
-						const isRequired = field.meta?.required ?? false;
+					return editableFields.map(
+						(field: {
+							field: string;
+							meta?: { display_name?: string; required?: boolean; note?: string; type?: string };
+						}) => {
+							const displayName =
+								field.meta?.display_name ||
+								field.field.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase());
+							const isRequired = field.meta?.required ?? false;
 
-						return {
-							name: isRequired ? `${displayName} *` : displayName,
-							value: field.field,
-							description: field.meta?.note || '',
-						};
-					});
+							return {
+								name: isRequired ? `${displayName} *` : displayName,
+								value: field.field,
+								description: field.meta?.note || '',
+							};
+						},
+					);
 				} catch (error) {
-					throw new Error(
+					throw new NodeOperationError(
+						this.getNode(),
 						`Failed to load file fields: ${error instanceof Error ? error.message : String(error)}`,
 					);
 				}
@@ -214,7 +260,10 @@ export class Directus implements INodeType {
 	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
 		const items = this.getInputData();
 		const returnData: INodeExecutionData[] = [];
-		const credentials = (await this.getCredentials('directusApi')) as any;
+		const credentials = (await this.getCredentials('directusApi')) as {
+			url: string;
+			token: string;
+		};
 
 		for (let i = 0; i < items.length; i++) {
 			try {
@@ -222,8 +271,8 @@ export class Directus implements INodeType {
 				const operation = this.getNodeParameter('operation', i) as string;
 
 				// Helper function to make authenticated requests
-				const makeRequest = async (options: any) => {
-					return await this.helpers.request({
+				const makeRequest = async (options: IHttpRequestOptions) => {
+					return await this.helpers.httpRequest({
 						...options,
 						baseURL: credentials.url,
 						headers: {
@@ -235,20 +284,22 @@ export class Directus implements INodeType {
 					});
 				};
 
-				let responseData: any;
+				let responseData: unknown;
 
 				if (resource === 'item') {
 					const collection = this.getNodeParameter('collection', i) as string;
 
 					switch (operation) {
 						case 'create': {
-							const collectionFields = this.getNodeParameter('collectionFields', i) as any;
+							const collectionFields = this.getNodeParameter('collectionFields', i) as {
+								fields?: { field?: Array<{ name: string; value: unknown }> };
+							};
 							const inputData = items[i].json;
 
-							let body: any =
+							const body: Record<string, unknown> =
 								inputData.payload && typeof inputData.payload === 'object'
-									? inputData.payload
-									: inputData;
+									? (inputData.payload as Record<string, unknown>)
+									: (inputData as Record<string, unknown>);
 
 							if (collectionFields?.fields?.field) {
 								for (const field of collectionFields.fields.field) {
@@ -271,7 +322,7 @@ export class Directus implements INodeType {
 							let body;
 							try {
 								body = typeof jsonData === 'string' ? JSON.parse(jsonData) : jsonData;
-							} catch (error) {
+							} catch {
 								throw new NodeOperationError(this.getNode(), 'Invalid JSON format');
 							}
 							responseData = await makeRequest({
@@ -284,13 +335,15 @@ export class Directus implements INodeType {
 
 						case 'update': {
 							const itemId = this.getNodeParameter('itemId', i) as string;
-							const collectionFields = this.getNodeParameter('collectionFields', i) as any;
+							const collectionFields = this.getNodeParameter('collectionFields', i) as {
+								fields?: { field?: Array<{ name: string; value: unknown }> };
+							};
 							const inputData = items[i].json;
 
-							let body: any =
+							const body: Record<string, unknown> =
 								inputData.payload && typeof inputData.payload === 'object'
-									? inputData.payload
-									: inputData;
+									? (inputData.payload as Record<string, unknown>)
+									: (inputData as Record<string, unknown>);
 
 							if (collectionFields?.fields?.field) {
 								for (const field of collectionFields.fields.field) {
@@ -314,7 +367,7 @@ export class Directus implements INodeType {
 							let body;
 							try {
 								body = typeof jsonData === 'string' ? JSON.parse(jsonData) : jsonData;
-							} catch (error) {
+							} catch {
 								throw new NodeOperationError(this.getNode(), 'Invalid JSON format');
 							}
 							responseData = await makeRequest({
@@ -331,7 +384,7 @@ export class Directus implements INodeType {
 								method: 'DELETE',
 								url: `/items/${collection}/${itemId}`,
 							});
-							responseData = { success: true, deletedId: itemId };
+							responseData = { deleted: true, id: itemId };
 							break;
 						}
 
@@ -356,7 +409,7 @@ export class Directus implements INodeType {
 						}
 
 						default:
-							throw new Error(`Unknown operation: ${operation}`);
+							throw new NodeOperationError(this.getNode(), `Unknown operation: ${operation}`);
 					}
 				} else if (resource === 'user') {
 					switch (operation) {
@@ -366,10 +419,13 @@ export class Directus implements INodeType {
 							const invite_url = this.getNodeParameter('invite_url', i) as string;
 
 							if (!email) {
-								throw new Error('Email is required for user invitation');
+								throw new NodeOperationError(
+									this.getNode(),
+									'Email is required for user invitation',
+								);
 							}
 
-							const body: Record<string, any> = { email };
+							const body: Record<string, unknown> = { email };
 							if (role) body.role = role;
 							if (invite_url) body.invite_url = invite_url;
 
@@ -384,20 +440,22 @@ export class Directus implements INodeType {
 								message: 'User invitation sent successfully',
 								email,
 								status: 'invited',
-								...responseData,
+								...(responseData as Record<string, unknown>),
 							};
 							break;
 						}
 
 						case 'update': {
 							const userId = this.getNodeParameter('userId', i) as string;
-							const userFields = this.getNodeParameter('userFields', i) as any;
+							const userFields = this.getNodeParameter('userFields', i) as {
+								fields?: { field?: Array<{ name: string; value: unknown }> };
+							};
 							const inputData = items[i].json;
 
-							let body: any =
+							const body: Record<string, unknown> =
 								inputData.payload && typeof inputData.payload === 'object'
-									? inputData.payload
-									: inputData;
+									? (inputData.payload as Record<string, unknown>)
+									: (inputData as Record<string, unknown>);
 
 							if (userFields?.fields?.field) {
 								for (const field of userFields.fields.field) {
@@ -421,7 +479,7 @@ export class Directus implements INodeType {
 								method: 'DELETE',
 								url: `/users/${userId}`,
 							});
-							responseData = { success: true, deletedId: userId };
+							responseData = { deleted: true, id: userId };
 							break;
 						}
 
@@ -446,7 +504,7 @@ export class Directus implements INodeType {
 						}
 
 						default:
-							throw new Error(`Unknown operation: ${operation}`);
+							throw new NodeOperationError(this.getNode(), `Unknown operation: ${operation}`);
 					}
 				} else if (resource === 'file') {
 					switch (operation) {
@@ -457,10 +515,10 @@ export class Directus implements INodeType {
 							const folder = this.getNodeParameter('folder', i) as string;
 
 							if (!file) {
-								throw new Error('File is required for upload');
+								throw new NodeOperationError(this.getNode(), 'File is required for upload');
 							}
 
-							const body: Record<string, any> = { file };
+							const body: Record<string, unknown> = { file };
 							if (title) body.title = title;
 							if (description) body.description = description;
 							if (folder) body.folder = folder;
@@ -475,13 +533,15 @@ export class Directus implements INodeType {
 
 						case 'update': {
 							const fileId = this.getNodeParameter('fileId', i) as string;
-							const fileFields = this.getNodeParameter('fileFields', i) as any;
+							const fileFields = this.getNodeParameter('fileFields', i) as {
+								fields?: { field?: Array<{ name: string; value: unknown }> };
+							};
 							const inputData = items[i].json;
 
-							let body: any =
+							const body: Record<string, unknown> =
 								inputData.payload && typeof inputData.payload === 'object'
-									? inputData.payload
-									: inputData;
+									? (inputData.payload as Record<string, unknown>)
+									: (inputData as Record<string, unknown>);
 
 							if (fileFields?.fields?.field) {
 								for (const field of fileFields.fields.field) {
@@ -505,7 +565,7 @@ export class Directus implements INodeType {
 								method: 'DELETE',
 								url: `/files/${fileId}`,
 							});
-							responseData = { success: true, deletedId: fileId };
+							responseData = { deleted: true, id: fileId };
 							break;
 						}
 
@@ -530,10 +590,10 @@ export class Directus implements INodeType {
 						}
 
 						default:
-							throw new Error(`Unknown operation: ${operation}`);
+							throw new NodeOperationError(this.getNode(), `Unknown operation: ${operation}`);
 					}
 				} else {
-					throw new Error(`Unknown resource: ${resource}`);
+					throw new NodeOperationError(this.getNode(), `Unknown resource: ${resource}`);
 				}
 
 				let parsedResponse = responseData;
@@ -545,14 +605,51 @@ export class Directus implements INodeType {
 					}
 				}
 
-				const itemData = parsedResponse.data || parsedResponse;
+				const itemData = (parsedResponse as { data?: unknown })?.data || parsedResponse;
 
-				if (Array.isArray(itemData)) {
-					for (const item of itemData) {
+				// Apply simplification if requested (for users and files)
+				let processedData = itemData;
+				if (resource === 'user' || resource === 'file') {
+					const simplify = this.getNodeParameter('simplify', i, false) as boolean;
+					if (simplify && Array.isArray(itemData)) {
+						processedData = itemData.map((item: any) => {
+							if (resource === 'user') {
+								// Return only essential fields for simplified user output
+								return {
+									id: item.id,
+									...(item.email && { email: item.email }),
+									...(item.first_name && { first_name: item.first_name }),
+									...(item.last_name && { last_name: item.last_name }),
+									...(item.status && { status: item.status }),
+									...(item.role && { role: item.role }),
+									...(item.date_created && { date_created: item.date_created }),
+									...(item.last_access && { last_access: item.last_access }),
+								};
+							} else if (resource === 'file') {
+								// Return only essential fields for simplified file output
+								return {
+									id: item.id,
+									...(item.filename_download && { filename_download: item.filename_download }),
+									...(item.title && { title: item.title }),
+									...(item.type && { type: item.type }),
+									...(item.filesize && { filesize: item.filesize }),
+									...(item.width && { width: item.width }),
+									...(item.height && { height: item.height }),
+									...(item.date_created && { date_created: item.date_created }),
+									...(item.date_updated && { date_updated: item.date_updated }),
+								};
+							}
+							return item;
+						});
+					}
+				}
+
+				if (Array.isArray(processedData)) {
+					for (const item of processedData) {
 						returnData.push({ json: item, pairedItem: { item: i } });
 					}
 				} else {
-					returnData.push({ json: itemData, pairedItem: { item: i } });
+					returnData.push({ json: processedData as IDataObject, pairedItem: { item: i } });
 				}
 			} catch (error) {
 				if (this.continueOnFail()) {

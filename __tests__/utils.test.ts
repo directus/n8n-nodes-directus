@@ -280,7 +280,7 @@ describe('Directus Utils', () => {
 			const result = convertDirectusFieldToN8n(choiceField as any);
 			expect(result?.type).toBe('options');
 			expect(result?.options).toHaveLength(2);
-			expect(result?.options[0]).toEqual({ name: 'Active', value: 'active' });
+			expect(result?.options?.[0]).toEqual({ name: 'Active', value: 'active' });
 		});
 
 		it('should handle fields that should be skipped', () => {

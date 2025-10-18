@@ -15,7 +15,7 @@ module.exports = {
 		ecmaVersion: 2020,
 	},
 
-	ignorePatterns: ['.eslintrc.js', '**/*.js', '**/node_modules/**', '**/dist/**'],
+	ignorePatterns: ['.eslintrc.js', '**/node_modules/**', '**/dist/**'],
 
 	rules: {
 		// General rules
