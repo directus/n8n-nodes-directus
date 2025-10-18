@@ -18,9 +18,10 @@ npm install n8n-nodes-directus
 
 ### Directus Node
 
-- **Items**: Create, read, update, delete items in collections
-- **Users**: Invite, update, delete users
-- **Files**: Upload, update, delete files
+- **Items**: Create, Read, Update, Delete, Get All items in collections
+- **Users**: Invite, Update, Delete, Get, Get All users with Simplify option
+- **Files**: Upload, Update, Delete, Get, Get All files with Simplify option
+- **Raw JSON Operations**: Create/Update with raw JSON data for advanced use cases
 
 ### Directus Trigger Node
 
@@ -32,9 +33,11 @@ npm install n8n-nodes-directus
 
 - **Dynamic Field Loading**: Automatically loads available collections and fields from your Directus instance
 - **Smart Field Processing**: Handles complex field types and relationships
+- **Simplify Option**: Returns essential fields only for Users and Files "Get All" operations
 - **Robust Error Handling**: Comprehensive error handling with detailed error messages
 - **Webhook Management**: Automatic webhook creation and cleanup for trigger nodes
 - **Type Safety**: Full TypeScript support with proper type definitions
+- **UX Compliance**: Follows n8n community node UX guidelines with proper naming and placeholders
 
 ## Credentials
 
@@ -78,9 +81,11 @@ npm run build
 ### Commands
 
 ```bash
-npm run build         # Build nodes and credentials
-npm run dev           # Start n8n with your node loaded
-npm run lint          # Check code style
+npm run build:n8n    # Build nodes and credentials using n8n-node CLI
+npm run dev:n8n       # Start n8n with your node loaded
+npm run lint:n8n      # Check code style using n8n-node CLI
+npm run lintfix:n8n   # Fix code style issues
+npm run test          # Run test suite
 npm run release       # Publish to npm
 ```
 
