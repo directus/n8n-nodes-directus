@@ -499,27 +499,6 @@ export function processFieldValue(value: unknown): unknown {
 		return value;
 	}
 
-	if (typeof value === 'string') {
-		const trimmed = value.trim();
-
-		if (
-			(trimmed.startsWith('"') && trimmed.endsWith('"')) ||
-			(trimmed.startsWith("'") && trimmed.endsWith("'"))
-		) {
-			return trimmed.slice(1, -1);
-		}
-
-		if (!isNaN(Number(trimmed)) && !isNaN(parseFloat(trimmed))) {
-			return Number(trimmed);
-		}
-
-		if (trimmed.toLowerCase() === 'true') return true;
-		if (trimmed.toLowerCase() === 'false') return false;
-		if (trimmed.toLowerCase() === 'null') return null;
-
-		return trimmed;
-	}
-
 	return String(value);
 }
 
