@@ -14,7 +14,8 @@ services:
       - N8N_CUSTOM_EXTENSIONS=/home/node/.n8n/custom
     volumes:
       - n8n_data:/home/node/.n8n
-      - /Users/lindsey/Documents/Code/directus-labs/Integrations/n8n-node/n8n-directus/dist:/home/node/.n8n/custom/nodes/@directus/n8n-nodes-directus
+      # Set N8N_DIRECTUS_DIST in your .env file to the path of your n8n-directus/dist directory
+      - ${N8N_DIRECTUS_DIST}:/home/node/.n8n/custom/nodes/@directus/n8n-nodes-directus
 
 volumes:
   n8n_data:
