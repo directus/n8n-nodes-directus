@@ -37,10 +37,10 @@ export const itemOperations: INodeProperties[] = [
 				action: 'Get an item',
 			},
 			{
-				name: 'Get All',
+				name: 'Get Many',
 				value: 'getAll',
-				description: 'Get all items from a collection',
-				action: 'Get all items',
+				description: 'Get many items from a collection',
+				action: 'Get many items',
 			},
 			{
 				name: 'Update',
@@ -84,10 +84,10 @@ export const userOperations: INodeProperties[] = [
 				action: 'Get a user',
 			},
 			{
-				name: 'Get All',
+				name: 'Get Many',
 				value: 'getAll',
-				description: 'Get all users',
-				action: 'Get all users',
+				description: 'Get many users',
+				action: 'Get many users',
 			},
 			{
 				name: 'Invite User',
@@ -131,10 +131,10 @@ export const fileOperations: INodeProperties[] = [
 				action: 'Get a file',
 			},
 			{
-				name: 'Get All',
+				name: 'Get Many',
 				value: 'getAll',
-				description: 'Get all files',
-				action: 'Get all files',
+				description: 'Get many files',
+				action: 'Get many files',
 			},
 			{
 				name: 'Update',

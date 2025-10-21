@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { jest } from '@jest/globals';
 
 export function createMockExecuteFunctions(
@@ -15,19 +14,19 @@ export function createMockExecuteFunctions(
 		getCurrentNodeParameter: jest.fn((parameter: string) => {
 			return options.nodeParameters[parameter];
 		}),
-		getCredentials: jest.fn().mockResolvedValue(options.credentials || {}),
+		getCredentials: jest.fn<any>().mockResolvedValue(options.credentials || {}),
 		getInputData: jest.fn(() => {
 			return options.inputData || [{ json: {} }];
 		}),
 		helpers: {
-			request: jest.fn().mockResolvedValue({ data: { data: [] } }),
-			httpRequest: jest.fn().mockResolvedValue({
+			request: jest.fn<any>().mockResolvedValue({ data: { data: [] } }),
+			httpRequest: jest.fn<any>().mockResolvedValue({
 				data: {
 					data: [{ id: 1, name: 'Test User' }],
 					id: 'flow-id-123',
 				},
 			}),
-			requestWithAuthentication: jest.fn().mockResolvedValue({ data: { data: [] } }),
+			requestWithAuthentication: jest.fn<any>().mockResolvedValue({ data: { data: [] } }),
 		},
 		continueOnFail: jest.fn(() => false),
 		getNode: jest.fn(() => ({
@@ -62,15 +61,15 @@ export function createMockWebhookFunctions(
 			return 'https://webhook.url';
 		}),
 		helpers: {
-			request: jest.fn().mockResolvedValue({ data: { data: [] } }),
-			httpRequest: jest.fn().mockResolvedValue({
+			request: jest.fn<any>().mockResolvedValue({ data: { data: [] } }),
+			httpRequest: jest.fn<any>().mockResolvedValue({
 				data: {
 					data: [{ id: 1, name: 'Test User' }],
 					id: 'flow-id-123',
 				},
 			}),
 		},
-		getCredentials: jest.fn().mockResolvedValue({}),
+		getCredentials: jest.fn<any>().mockResolvedValue({}),
 		getWorkflowStaticData: jest.fn(() => ({ flowId: undefined })),
 		getNode: jest.fn(() => ({
 			id: 'test-node-id',

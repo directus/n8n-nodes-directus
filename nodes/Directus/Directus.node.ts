@@ -612,32 +612,30 @@ export class Directus implements INodeType {
 				if (resource === 'user' || resource === 'file') {
 					const simplify = this.getNodeParameter('simplify', i, false) as boolean;
 					if (simplify && Array.isArray(itemData)) {
-						processedData = itemData.map((item: any) => {
+						processedData = itemData.map((item: Record<string, unknown>) => {
 							if (resource === 'user') {
 								// Return only essential fields for simplified user output
-								return {
-									id: item.id,
-									...(item.email && { email: item.email }),
-									...(item.first_name && { first_name: item.first_name }),
-									...(item.last_name && { last_name: item.last_name }),
-									...(item.status && { status: item.status }),
-									...(item.role && { role: item.role }),
-									...(item.date_created && { date_created: item.date_created }),
-									...(item.last_access && { last_access: item.last_access }),
-								};
+								const result: Record<string, unknown> = { id: item.id };
+								if (item.email) result.email = item.email;
+								if (item.first_name) result.first_name = item.first_name;
+								if (item.last_name) result.last_name = item.last_name;
+								if (item.status) result.status = item.status;
+								if (item.role) result.role = item.role;
+								if (item.date_created) result.date_created = item.date_created;
+								if (item.last_access) result.last_access = item.last_access;
+								return result;
 							} else if (resource === 'file') {
 								// Return only essential fields for simplified file output
-								return {
-									id: item.id,
-									...(item.filename_download && { filename_download: item.filename_download }),
-									...(item.title && { title: item.title }),
-									...(item.type && { type: item.type }),
-									...(item.filesize && { filesize: item.filesize }),
-									...(item.width && { width: item.width }),
-									...(item.height && { height: item.height }),
-									...(item.date_created && { date_created: item.date_created }),
-									...(item.date_updated && { date_updated: item.date_updated }),
-								};
+								const result: Record<string, unknown> = { id: item.id };
+								if (item.filename_download) result.filename_download = item.filename_download;
+								if (item.title) result.title = item.title;
+								if (item.type) result.type = item.type;
+								if (item.filesize) result.filesize = item.filesize;
+								if (item.width) result.width = item.width;
+								if (item.height) result.height = item.height;
+								if (item.date_created) result.date_created = item.date_created;
+								if (item.date_updated) result.date_updated = item.date_updated;
+								return result;
 							}
 							return item;
 						});

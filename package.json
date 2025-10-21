@@ -27,7 +27,7 @@
 		"dev": "tsc --watch",
 		"dev:n8n": "n8n-node dev",
 		"format": "prettier nodes credentials --write",
-		"lint": "eslint --no-warn-ignored package.json",
+		"lint": "eslint nodes credentials package.json",
 		"lint:n8n": "n8n-node lint",
 		"lintfix": "eslint nodes credentials package.json --fix",
 		"lintfix:n8n": "n8n-node lint --fix",
