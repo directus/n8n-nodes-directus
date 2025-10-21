@@ -84,10 +84,10 @@ This project uses the official n8n-node CLI tool for development and follows n8n
 
 ### Prerequisites
 
-- Node.js 20+
-- npm or yarn
-- Directus instance for testing
-- n8n instance (for testing the nodes)
+- **Node.js 20+**
+- **npm or yarn**
+- **Directus instance** for testing (cloud or self-hosted)
+- **ngrok** (for webhook testing) - install from [ngrok.com](https://ngrok.com/)
 
 ### Setup
 
@@ -102,6 +102,27 @@ npm install
 # Build the project
 npm run build
 ```
+
+### Quick Start
+
+1. **Start n8n with your node loaded**:
+
+   ```bash
+   npm run dev:n8n
+   ```
+
+   This will:
+   - Link your custom node to n8n
+   - Start n8n development server
+   - Make your Directus nodes available in n8n
+
+2. **Access n8n**: Open http://localhost:5678 in your browser
+
+3. **Configure credentials**:
+   - Add your Directus API credentials
+   - Test the connection
+
+4. **Create workflows**: Use the Directus nodes in your workflows
 
 ### Project Structure
 
@@ -141,7 +162,9 @@ npm run release       # Publish to npm using n8n-node CLI
 
 ### Testing
 
-1. **Start n8n with your node**:
+#### Basic Node Testing
+
+1. **Start n8n with your node loaded**:
 
    ```bash
    npm run dev:n8n
@@ -149,31 +172,91 @@ npm run release       # Publish to npm using n8n-node CLI
 
 2. **Access n8n**: Open http://localhost:5678 in your browser
 
-3. **Configure credentials**: Add your Directus API credentials
+3. **Configure credentials**:
+   - Go to **Credentials** → **Add Credential**
+   - Search for "Directus API" and add your credentials
+   - Test the connection
 
-4. **Test operations**: Create workflows using the Directus nodes
+4. **Test operations**:
+   - Create a new workflow
+   - Add a Directus node
+   - Test various operations (Create, Read, Update, Delete)
 
-### Testing Webhooks
+#### Webhook Testing (Requires ngrok)
 
-For webhook testing, you'll need to expose n8n via a public URL since Directus cannot reach localhost:
+For testing the **Directus Trigger** node, you need to expose n8n via a public URL since Directus cannot reach localhost:
 
-1. **Set up ngrok**:
+1. **Install ngrok** (if not already installed):
+
+   ```bash
+   # macOS with Homebrew
+   brew install ngrok
+
+   # Or download from https://ngrok.com/
+   ```
+
+2. **Start n8n** (in one terminal):
+
+   ```bash
+   npm run dev:n8n
+   ```
+
+3. **Start ngrok** (in another terminal):
 
    ```bash
    ngrok http 5678
    ```
 
-2. **Create a workflow** with Directus Trigger node
+   This will give you a public URL like `https://abc123.ngrok-free.dev`
 
-3. **Configure the trigger** (resource, event, collection)
+4. **Create a webhook workflow**:
+   - Add a **Directus Trigger** node
+   - Configure the trigger (resource, event, collection)
+   - Activate the workflow
+   - Copy the webhook URL from n8n
 
-4. **Activate the workflow**
+5. **Update Directus webhook**:
+   - In Directus, go to **Settings → Flows**
+   - Find the created flow and edit it
+   - Replace `localhost:5678` with your ngrok URL
+   - Save the flow
 
-5. **Manual step**: In Directus, go to **Settings → Flows** and edit the created flows to replace `localhost:5678` with your ngrok URL (e.g., `https://your-ngrok-url.ngrok-free.dev`)
+6. **Test the webhook**:
+   - Create/update items in Directus
+   - Check if the webhook triggers in n8n
 
-6. **Test**: Create/update items in Directus to trigger the webhook
+**Note**: The manual URL replacement step is required because Directus cannot reach localhost URLs directly.
 
-**Note**: Directus cannot reach localhost URLs, so manual URL replacement in the flows is required for webhook testing.
+### Troubleshooting
+
+#### Common Issues
+
+1. **n8n not starting**:
+   - Ensure Node.js 20+ is installed
+   - Run `npm install` to install dependencies
+   - Check if port 5678 is available
+
+2. **Node not appearing in n8n**:
+   - Run `npm run build` first
+   - Restart `npm run dev:n8n`
+   - Check the terminal for any error messages
+
+3. **Webhook not triggering**:
+   - Ensure ngrok is running and accessible
+   - Verify the webhook URL in Directus flows
+   - Check n8n workflow is activated
+   - Test the ngrok URL directly in browser
+
+4. **Build errors**:
+   - Run `npm run lint` to check for code issues
+   - Run `npm run lintfix` to auto-fix issues
+   - Ensure TypeScript compilation passes
+
+#### Getting Help
+
+- Check the [GitHub Issues](https://github.com/directus/n8n-nodes-directus/issues) for known problems
+- Run `npm run test` to verify everything works
+- Use `npm run test:coverage` to see test coverage
 
 ## Contributing
 
