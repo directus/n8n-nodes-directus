@@ -125,6 +125,13 @@ export class DirectusTrigger implements INodeType {
 				default: 'upload',
 				description: 'The event to trigger on (only upload is supported for files)',
 			},
+			{
+				displayName: 'N8N URL',
+				name: 'n8nUrl',
+				type: 'string',
+				default: 'http://localhost:5678',
+				description: 'The URL of the n8n instance to send the webhook to. If using docker, you may need to use host.docker.internal instead of localhost.',
+			}
 		],
 		usableAsTool: true,
 	};
@@ -555,7 +562,7 @@ export class DirectusTrigger implements INodeType {
 		}
 
 		// Process the webhook payload
-		let workflowData: { json: Record<string, unknown> };
+		let workflowData: INodeExecutionData;
 
 		if (resource === 'item') {
 			// Extract the item ID from various possible locations in the payload
@@ -614,7 +621,7 @@ export class DirectusTrigger implements INodeType {
 					event: (webhookPayload as { event?: string })?.event || `items.${event}`,
 					collection: collection,
 					action: event,
-					payload: completeData,
+					// payload: completeData,
 					// Always include the item ID for use in other operations
 					id: itemId,
 					key: String(itemId), // For backward compatibility
@@ -679,7 +686,7 @@ export class DirectusTrigger implements INodeType {
 				json: {
 					event: (webhookPayload as { event?: string })?.event || `users.${event}`,
 					action: event,
-					payload: completeData,
+					// payload: completeData,
 					// Always include the user ID for use in other operations
 					id: userId,
 					key: String(userId), // For backward compatibility
@@ -712,7 +719,7 @@ export class DirectusTrigger implements INodeType {
 				json: {
 					event: (webhookPayload as { event?: string })?.event || `files.${event}`,
 					action: event,
-					payload: completeData,
+					// payload: completeData,
 					// Always include the file ID for use in other operations
 					id: fileId,
 					key: String(fileId), // For backward compatibility
@@ -735,7 +742,7 @@ export class DirectusTrigger implements INodeType {
 			workflowData = {
 				json: {
 					event: (webhookPayload as { event?: string })?.event || `${resource}.${event}`,
-					payload: webhookPayload,
+					// payload: webhookPayload,
 					timestamp: new Date().toISOString(),
 					error: 'Failed to process webhook data',
 				},

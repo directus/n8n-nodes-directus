@@ -26,7 +26,7 @@ export async function makeDirectusRequest(
 		headers?: Record<string, string>;
 	} = {},
 ): Promise<unknown> {
-	const credentials = (await functions.getCredentials('directusApi')) as DirectusCredentials;
+	const credentials = await functions.getCredentials<DirectusCredentials>('directusApi');
 	const baseUrl = normalizeUrl(credentials.url);
 
 	const { method = 'GET', body, headers = {} } = options;
@@ -40,7 +40,7 @@ export async function makeDirectusRequest(
 
 	for (const variant of urlVariants) {
 		try {
-			const response = await functions.helpers.request({
+			const response = await functions.helpers.httpRequest({
 				method: method as 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH',
 				url: `${baseUrl}/${variant}`,
 				headers: requestHeaders,
