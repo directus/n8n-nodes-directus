@@ -1,10 +1,5 @@
-import { describe, it, expect } from '@jest/globals';
-import {
-	formatTitle,
-	formatCollectionLabel,
-	formatRoleLabel,
-	createEnhancedItemLabel,
-} from '../src/utils/format-title';
+import { describe, it, expect } from 'vitest';
+import { formatTitle, createEnhancedItemLabel } from '../src/utils/format-title';
 import {
 	isRelationshipField,
 	getFieldRelationshipInfo,
@@ -27,36 +22,6 @@ describe('Format Title Utils', () => {
 
 		it('should handle empty strings', () => {
 			expect(formatTitle('')).toBe('');
-		});
-	});
-
-	describe('formatCollectionLabel', () => {
-		it('should format collection names properly', () => {
-			expect(formatCollectionLabel({ collection: 'users' })).toBe('Users');
-			expect(formatCollectionLabel({ collection: 'user_profiles' })).toBe('User Profiles');
-			expect(formatCollectionLabel({ collection: 'blog_posts' })).toBe('Blog Posts');
-		});
-
-		it('should use translations when available', () => {
-			const collection = {
-				collection: 'users',
-				meta: {
-					translations: [{ translation: 'Utilisateurs' }],
-				},
-			};
-			expect(formatCollectionLabel(collection)).toBe('Utilisateurs');
-		});
-	});
-
-	describe('formatRoleLabel', () => {
-		it('should format role names properly', () => {
-			expect(formatRoleLabel({ name: 'admin' })).toBe('admin');
-			expect(formatRoleLabel({ name: 'content_manager' })).toBe('content_manager');
-			expect(formatRoleLabel({ name: 'public' })).toBe('public');
-		});
-
-		it('should handle roles without names', () => {
-			expect(formatRoleLabel({})).toBe('Role');
 		});
 	});
 
@@ -237,9 +202,10 @@ describe('Directus Utils', () => {
 		});
 
 		it('should handle create mode correctly', () => {
-			// In create mode, id should not be considered a system field
+			// In create mode, id should always be considered a system field (filtered out)
+			// because Directus sets it automatically
 			const field = { field: 'id' };
-			expect(isSystemField(field as any, true)).toBe(false);
+			expect(isSystemField(field as any, true)).toBe(true);
 		});
 	});
 

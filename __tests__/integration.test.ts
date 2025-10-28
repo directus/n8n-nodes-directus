@@ -1,10 +1,10 @@
-import { describe, it, expect, beforeEach, jest } from '@jest/globals';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { DirectusTrigger } from '../nodes/DirectusTrigger/DirectusTrigger.node';
 import { createMockWebhookFunctions } from './helpers';
 
 // Mock the directus utils
-jest.mock('../src/utils/directus', () => ({
-	getCollections: jest.fn(),
+vi.mock('../src/utils/directus', () => ({
+	getCollections: vi.fn(),
 }));
 
 describe('Integration Tests', () => {
@@ -16,7 +16,7 @@ describe('Integration Tests', () => {
 			bodyData: {},
 		});
 
-		jest.clearAllMocks();
+		vi.clearAllMocks();
 	});
 
 	describe('DirectusTrigger - File Webhook Restrictions)', () => {

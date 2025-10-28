@@ -14,6 +14,8 @@ import {
 	formatDirectusError,
 	convertCollectionFieldsToN8n,
 	processFieldValue,
+	shouldSkipField,
+	formatDisplayName,
 } from '../../src/utils/directus';
 import { getFieldsFromAPI, getRolesFromAPI } from '../../src/utils/api';
 import { SYSTEM_FIELDS } from '../../src/utils/constants';
@@ -105,62 +107,16 @@ export class Directus implements INodeType {
 			): Promise<Array<{ name: string; value: string }>> {
 				try {
 					const fields = await getFieldsFromAPI(this, 'directus_users');
-					const editableFields = fields.filter(
-						(field: {
-							field: string;
-							type?: string;
-							meta?: {
-								special?: string[];
-								locked?: boolean;
-								hidden?: boolean;
-								required?: boolean;
-								note?: string;
-								display_name?: string;
-								type?: string;
-							};
-						}) => {
-							if (!field || !field.meta) {
-								return false;
-							}
+					const systemFields = [
+						...SYSTEM_FIELDS.COMMON_SYSTEM_FIELDS,
+						...SYSTEM_FIELDS.USER_SPECIFIC_FIELDS,
+					];
+					const editableFields = fields.filter((field) => !shouldSkipField(field));
 
-							const special = field.meta?.special || [];
-
-							if (special.includes('m2a')) {
-								return false;
-							}
-
-							if (field.meta?.locked) {
-								return false;
-							}
-
-							if (field.meta?.hidden) {
-								return false;
-							}
-
-							if (field.type === 'alias') {
-								return false;
-							}
-
-							if (field.field.startsWith('$')) {
-								return false;
-							}
-
-							if (SYSTEM_FIELDS.USER_SENSITIVE.includes(field.field)) {
-								return false;
-							}
-
-							return true;
-						},
-					);
-
-					return editableFields.map(
-						(field: {
-							field: string;
-							meta?: { display_name?: string; required?: boolean; note?: string; type?: string };
-						}) => {
-							const displayName =
-								field.meta?.display_name ||
-								field.field.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase());
+					return editableFields
+						.filter((field) => !systemFields.includes(field.field))
+						.map((field) => {
+							const displayName = formatDisplayName(field);
 							const isRequired = field.meta?.required ?? false;
 
 							return {
@@ -168,8 +124,7 @@ export class Directus implements INodeType {
 								value: field.field,
 								description: field.meta?.note || '',
 							};
-						},
-					);
+						});
 				} catch (error) {
 					throw new NodeOperationError(
 						this.getNode(),
@@ -182,62 +137,16 @@ export class Directus implements INodeType {
 			): Promise<Array<{ name: string; value: string }>> {
 				try {
 					const fields = await getFieldsFromAPI(this, 'directus_files');
-					const editableFields = fields.filter(
-						(field: {
-							field: string;
-							type?: string;
-							meta?: {
-								special?: string[];
-								locked?: boolean;
-								hidden?: boolean;
-								required?: boolean;
-								note?: string;
-								display_name?: string;
-								type?: string;
-							};
-						}) => {
-							if (!field || !field.meta) {
-								return false;
-							}
+					const systemFields = [
+						...SYSTEM_FIELDS.COMMON_SYSTEM_FIELDS,
+						...SYSTEM_FIELDS.FILE_SPECIFIC_FIELDS,
+					];
+					const editableFields = fields.filter((field) => !shouldSkipField(field));
 
-							const special = field.meta?.special || [];
-
-							if (special.includes('m2a')) {
-								return false;
-							}
-
-							if (field.meta?.locked) {
-								return false;
-							}
-
-							if (field.meta?.hidden) {
-								return false;
-							}
-
-							if (field.type === 'alias') {
-								return false;
-							}
-
-							if (field.field.startsWith('$')) {
-								return false;
-							}
-
-							if (SYSTEM_FIELDS.FILE_SENSITIVE.includes(field.field)) {
-								return false;
-							}
-
-							return true;
-						},
-					);
-
-					return editableFields.map(
-						(field: {
-							field: string;
-							meta?: { display_name?: string; required?: boolean; note?: string; type?: string };
-						}) => {
-							const displayName =
-								field.meta?.display_name ||
-								field.field.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase());
+					return editableFields
+						.filter((field) => !systemFields.includes(field.field))
+						.map((field) => {
+							const displayName = formatDisplayName(field);
 							const isRequired = field.meta?.required ?? false;
 
 							return {
@@ -245,8 +154,7 @@ export class Directus implements INodeType {
 								value: field.field,
 								description: field.meta?.note || '',
 							};
-						},
-					);
+						});
 				} catch (error) {
 					throw new NodeOperationError(
 						this.getNode(),

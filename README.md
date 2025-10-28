@@ -28,6 +28,9 @@ npm install @directus/n8n-nodes-directus
 
    ```bash
    npm install @directus/n8n-nodes-directus
+
+   # Or using pnpm
+   pnpm add @directus/n8n-nodes-directus
    ```
 
 2. **Configure credentials** in n8n:
@@ -84,8 +87,8 @@ This project uses the official n8n-node CLI tool for development and follows n8n
 
 ### Prerequisites
 
-- **Node.js 20+**
-- **npm or yarn**
+- **Node.js 22+**
+- **pnpm 8+** (recommended) or npm/yarn
 - **Directus instance** for testing (cloud or self-hosted)
 - **ngrok** (for webhook testing) - install from [ngrok.com](https://ngrok.com/)
 
@@ -97,10 +100,11 @@ git clone https://github.com/directus/n8n-nodes-directus.git
 cd n8n-nodes-directus
 
 # Install dependencies
-npm install
+pnpm install
+
 
 # Build the project
-npm run build
+pnpm build
 ```
 
 ### Quick Start
@@ -108,7 +112,7 @@ npm run build
 1. **Start n8n with your node loaded**:
 
    ```bash
-   npm run dev:n8n
+   pnpm dev:n8n
    ```
 
    This will:
@@ -138,26 +142,26 @@ npm run build
 ### Available Commands
 
 ```bash
-# Development
-npm run build         # Build the project (TypeScript compilation + assets)
-npm run dev           # Watch mode for TypeScript compilation
-npm run dev:n8n       # Start n8n with your node loaded for testing
-npm run build:n8n    # Build nodes and credentials using n8n-node CLI
+# Development (replace pnpm with npm if using npm)
+pnpm build         # Build the project (TypeScript compilation + assets)
+pnpm dev           # Watch mode for TypeScript compilation
+pnpm dev:n8n       # Start n8n with your node loaded for testing
+pnpm build:n8n     # Build nodes and credentials using n8n-node CLI
 
 # Code Quality
-npm run lint          # Check code style (nodes, credentials, package.json)
-npm run lintfix       # Fix code style issues (nodes, credentials, package.json)
-npm run lint:n8n      # Check code style using n8n-node CLI
-npm run lintfix:n8n  # Fix code style issues using n8n-node CLI
-npm run format        # Format code using Prettier
+pnpm lint          # Check code style (nodes, credentials, package.json)
+pnpm lintfix       # Fix code style issues (nodes, credentials, package.json)
+pnpm lint:n8n      # Check code style using n8n-node CLI
+pnpm lintfix:n8n   # Fix code style issues using n8n-node CLI
+pnpm format        # Format code using Prettier
 
 # Testing
-npm run test          # Run test suite
-npm run test:watch    # Run tests in watch mode
-npm run test:coverage # Run tests with coverage report
+pnpm test            # Run test suite
+pnpm test:watch      # Run tests in watch mode
+pnpm test:coverage   # Run tests with coverage report
 
 # Publishing
-npm run release       # Publish to npm using n8n-node CLI
+pnpm release         # Publish to npm using n8n-node CLI
 ```
 
 ### Testing
@@ -167,7 +171,7 @@ npm run release       # Publish to npm using n8n-node CLI
 1. **Start n8n with your node loaded**:
 
    ```bash
-   npm run dev:n8n
+   pnpm dev:n8n
    ```
 
 2. **Access n8n**: Open http://localhost:5678 in your browser
@@ -198,7 +202,7 @@ For testing the **Directus Trigger** node, you need to expose n8n via a public U
 2. **Start n8n** (in one terminal):
 
    ```bash
-   npm run dev:n8n
+   pnpm dev:n8n
    ```
 
 3. **Start ngrok** (in another terminal):
@@ -232,13 +236,13 @@ For testing the **Directus Trigger** node, you need to expose n8n via a public U
 #### Common Issues
 
 1. **n8n not starting**:
-   - Ensure Node.js 20+ is installed
-   - Run `npm install` to install dependencies
+   - Ensure Node.js 22+ is installed
+   - Run `pnpm install` to install dependencies
    - Check if port 5678 is available
 
 2. **Node not appearing in n8n**:
-   - Run `npm run build` first
-   - Restart `npm run dev:n8n`
+   - Run `pnpm build` first
+   - Restart `pnpm dev:n8n`
    - Check the terminal for any error messages
 
 3. **Webhook not triggering**:
@@ -248,15 +252,15 @@ For testing the **Directus Trigger** node, you need to expose n8n via a public U
    - Test the ngrok URL directly in browser
 
 4. **Build errors**:
-   - Run `npm run lint` to check for code issues
-   - Run `npm run lintfix` to auto-fix issues
+   - Run `pnpm lint` to check for code issues
+   - Run `pnpm lintfix` to auto-fix issues
    - Ensure TypeScript compilation passes
 
 #### Getting Help
 
 - Check the [GitHub Issues](https://github.com/directus/n8n-nodes-directus/issues) for known problems
-- Run `npm run test` to verify everything works
-- Use `npm run test:coverage` to see test coverage
+- Run `pnpm test` to verify everything works
+- Use `pnpm test:coverage` to see test coverage
 
 ## Contributing
 

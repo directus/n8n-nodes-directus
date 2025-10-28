@@ -60,37 +60,7 @@ export function formatTitle(input: string, separator: RegExp = /\s|-|_/g): strin
 	return formattedWords.join(' ');
 }
 
-export function formatCollectionLabel(collection: {
-	collection: string;
-	meta?: { translations?: Array<{ translation: string }> };
-}) {
-	// Check if there's any translations for the collection label
-	if (collection.meta?.translations) {
-		// Get the first translation
-		const translation = collection.meta.translations[0];
-		return translation.translation;
-	}
-
-	// If there's no translation, return the formatted title
-	return formatTitle(collection.collection);
-}
-
-export function formatRoleLabel(role: { name?: string; id?: string }): string {
-	if (role.name) {
-		return role.name;
-	}
-
-	if (role.id) {
-		return formatTitle(role.id);
-	}
-
-	return 'Role';
-}
-
-export function getItemDisplayValue(
-	item: Record<string, unknown>,
-	preferredFields: string[],
-): string {
+function getItemDisplayValue(item: Record<string, unknown>, preferredFields: string[]): string {
 	for (const field of preferredFields) {
 		if (item[field]) return String(item[field]);
 	}

@@ -1,4 +1,4 @@
-import { jest } from '@jest/globals';
+import { vi } from 'vitest';
 
 export function createMockExecuteFunctions(
 	options: {
@@ -8,28 +8,28 @@ export function createMockExecuteFunctions(
 	} = { nodeParameters: {} },
 ): any {
 	return {
-		getNodeParameter: jest.fn((parameter: string, index: number) => {
+		getNodeParameter: vi.fn((parameter: string, index: number) => {
 			return options.nodeParameters[parameter];
 		}),
-		getCurrentNodeParameter: jest.fn((parameter: string) => {
+		getCurrentNodeParameter: vi.fn((parameter: string) => {
 			return options.nodeParameters[parameter];
 		}),
-		getCredentials: jest.fn<any>().mockResolvedValue(options.credentials || {}),
-		getInputData: jest.fn(() => {
+		getCredentials: vi.fn<any>().mockResolvedValue(options.credentials || {}),
+		getInputData: vi.fn(() => {
 			return options.inputData || [{ json: {} }];
 		}),
 		helpers: {
-			request: jest.fn<any>().mockResolvedValue({ data: { data: [] } }),
-			httpRequest: jest.fn<any>().mockResolvedValue({
+			request: vi.fn<any>().mockResolvedValue({ data: { data: [] } }),
+			httpRequest: vi.fn<any>().mockResolvedValue({
 				data: {
 					data: [{ id: 1, name: 'Test User' }],
 					id: 'flow-id-123',
 				},
 			}),
-			requestWithAuthentication: jest.fn<any>().mockResolvedValue({ data: { data: [] } }),
+			requestWithAuthentication: vi.fn<any>().mockResolvedValue({ data: { data: [] } }),
 		},
-		continueOnFail: jest.fn(() => false),
-		getNode: jest.fn(() => ({
+		continueOnFail: vi.fn(() => false),
+		getNode: vi.fn(() => ({
 			id: 'test-node-id',
 			name: 'Directus',
 			type: 'directus',
@@ -48,30 +48,30 @@ export function createMockWebhookFunctions(
 	} = { nodeParameters: {} },
 ): any {
 	return {
-		getNodeParameter: jest.fn((parameter: string, index: number) => {
+		getNodeParameter: vi.fn((parameter: string, index: number) => {
 			return options.nodeParameters[parameter];
 		}),
-		getBodyData: jest.fn(() => {
+		getBodyData: vi.fn(() => {
 			return options.bodyData;
 		}),
-		getHeaderData: jest.fn(() => {
+		getHeaderData: vi.fn(() => {
 			return options.headerData || {};
 		}),
-		getNodeWebhookUrl: jest.fn(() => {
+		getNodeWebhookUrl: vi.fn(() => {
 			return 'https://webhook.url';
 		}),
 		helpers: {
-			request: jest.fn<any>().mockResolvedValue({ data: { data: [] } }),
-			httpRequest: jest.fn<any>().mockResolvedValue({
+			request: vi.fn<any>().mockResolvedValue({ data: { data: [] } }),
+			httpRequest: vi.fn<any>().mockResolvedValue({
 				data: {
 					data: [{ id: 1, name: 'Test User' }],
 					id: 'flow-id-123',
 				},
 			}),
 		},
-		getCredentials: jest.fn<any>().mockResolvedValue({}),
-		getWorkflowStaticData: jest.fn(() => ({ flowId: undefined })),
-		getNode: jest.fn(() => ({
+		getCredentials: vi.fn<any>().mockResolvedValue({}),
+		getWorkflowStaticData: vi.fn(() => ({ flowId: undefined })),
+		getNode: vi.fn(() => ({
 			id: 'test-node-id',
 			name: 'Directus Trigger',
 			type: 'directusTrigger',

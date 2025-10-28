@@ -1,7 +1,5 @@
 // Common constants used across the n8n integration
 
-export const DEFAULT_LIMIT = 25;
-
 export const FALLBACK_DISPLAY_FIELDS = ['name', 'title', 'label', 'display', 'id'];
 
 export const SYSTEM_COLLECTION_PREFIX = 'directus_';
@@ -15,11 +13,10 @@ export const API_URL_VARIANTS = {
 	RELATIONS: ['relations', 'api/relations'],
 };
 
-// System fields that should be filtered out
+// System fields that should be filtered out (read-only/managed by Directus)
 export const SYSTEM_FIELDS = {
-	COMMON: ['date_created', 'date_updated', 'user_created', 'user_updated'],
-	USER_SENSITIVE: [
-		'id',
+	COMMON_SYSTEM_FIELDS: ['date_created', 'date_updated', 'user_created', 'user_updated', 'id'],
+	USER_SPECIFIC_FIELDS: [
 		'password',
 		'token',
 		'last_access',
@@ -28,13 +25,8 @@ export const SYSTEM_FIELDS = {
 		'external_identifier',
 		'auth_data',
 		'tfa_secret',
-		'date_created',
-		'date_updated',
-		'user_created',
-		'user_updated',
 	],
-	FILE_SENSITIVE: [
-		'id',
+	FILE_SPECIFIC_FIELDS: [
 		'storage',
 		'filename_disk',
 		'filename_download',
@@ -52,18 +44,4 @@ export const SYSTEM_FIELDS = {
 		'focal_point_x',
 		'focal_point_y',
 	],
-};
-
-// Field type mappings
-export const FIELD_TYPE_MAPPINGS: Record<string, string> = {
-	integer: 'number',
-	bigInteger: 'number',
-	float: 'number',
-	decimal: 'number',
-	boolean: 'boolean',
-	date: 'dateTime',
-	dateTime: 'dateTime',
-	timestamp: 'dateTime',
-	text: 'string',
-	json: 'string',
 };

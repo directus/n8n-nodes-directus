@@ -1,20 +1,40 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Directus } from '../nodes/Directus/Directus.node';
 import { createMockExecuteFunctions } from './helpers';
 
+// Import modules to access their mocks
+import * as directusUtils from '../src/utils/directus';
+import * as apiUtils from '../src/utils/api';
+
 // Mock the directus utils
-jest.mock('../src/utils/directus', () => ({
-	getCollections: jest.fn(),
-	convertCollectionFieldsToN8n: jest.fn(),
-	formatDirectusError: jest.fn((error: any) => error.message || 'Unknown error'),
-	createEnhancedItemLabel: jest.fn((item: any) => item.name || `Item ${item.id}`),
+vi.mock('../src/utils/directus', () => ({
+	getCollections: vi.fn(),
+	convertCollectionFieldsToN8n: vi.fn(),
+	formatDirectusError: vi.fn((error: any) => error.message || 'Unknown error'),
+	createEnhancedItemLabel: vi.fn((item: any) => item.name || `Item ${item.id}`),
 	FALLBACK_DISPLAY_FIELDS: ['name', 'title', 'label', 'display', 'id'],
+	shouldSkipField: vi.fn((field: any) => {
+		if (!field || !field.meta) return true;
+		const special = field.meta?.special || [];
+		if (special.includes('m2a')) return true;
+		if (field.meta?.locked) return true;
+		if (field.meta?.hidden) return true;
+		if (field.type === 'alias') return true;
+		if (field.field?.startsWith('$')) return true;
+		return false;
+	}),
+	formatDisplayName: vi.fn((field: any) => {
+		return (
+			field.meta?.display_name ||
+			field.field.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())
+		);
+	}),
 }));
 
 // Mock the API utils
-jest.mock('../src/utils/api', () => ({
-	getFieldsFromAPI: jest.fn(),
-	getRolesFromAPI: jest.fn(),
+vi.mock('../src/utils/api', () => ({
+	getFieldsFromAPI: vi.fn(),
+	getRolesFromAPI: vi.fn(),
 }));
 
 describe('Directus Node', () => {
@@ -22,7 +42,7 @@ describe('Directus Node', () => {
 	let mockExecuteFunctions: any;
 
 	beforeEach(() => {
-		jest.clearAllMocks();
+		vi.clearAllMocks();
 		node = new Directus();
 		mockExecuteFunctions = createMockExecuteFunctions();
 	});
@@ -67,8 +87,7 @@ describe('Directus Node', () => {
 					{ collection: 'posts', meta: { display_template: '{{title}}' } },
 				];
 
-				const { getCollections } = require('../src/utils/directus');
-				getCollections.mockResolvedValue(mockCollections);
+				vi.mocked(directusUtils.getCollections).mockResolvedValue(mockCollections);
 
 				const result = await node.methods!.loadOptions!.getCollections.call(mockExecuteFunctions);
 
@@ -76,12 +95,11 @@ describe('Directus Node', () => {
 					{ name: 'users', value: 'users' },
 					{ name: 'posts', value: 'posts' },
 				]);
-				expect(getCollections).toHaveBeenCalledWith(mockExecuteFunctions);
+				expect(directusUtils.getCollections).toHaveBeenCalledWith(mockExecuteFunctions);
 			});
 
 			it('should handle errors gracefully', async () => {
-				const { getCollections } = require('../src/utils/directus');
-				getCollections.mockRejectedValue(new Error('API Error'));
+				vi.mocked(directusUtils.getCollections).mockRejectedValue(new Error('API Error'));
 
 				await expect(
 					node.methods!.loadOptions!.getCollections.call(mockExecuteFunctions),
@@ -96,8 +114,7 @@ describe('Directus Node', () => {
 					{ id: '2', name: 'editor', admin_access: false },
 				];
 
-				const { getRolesFromAPI } = require('../src/utils/api');
-				getRolesFromAPI.mockResolvedValue(mockRoles);
+				vi.mocked(apiUtils.getRolesFromAPI).mockResolvedValue(mockRoles);
 
 				const result = await node.methods!.loadOptions!.getRoles.call(mockExecuteFunctions);
 
@@ -108,8 +125,7 @@ describe('Directus Node', () => {
 			});
 
 			it('should handle API errors', async () => {
-				const { getRolesFromAPI } = require('../src/utils/api');
-				getRolesFromAPI.mockRejectedValue(new Error('API Error'));
+				vi.mocked(apiUtils.getRolesFromAPI).mockRejectedValue(new Error('API Error'));
 
 				await expect(
 					node.methods!.loadOptions!.getRoles.call(mockExecuteFunctions),
@@ -122,10 +138,9 @@ describe('Directus Node', () => {
 				const mockFields = [
 					{ name: 'name', displayName: 'Name' },
 					{ name: 'email', displayName: 'Email' },
-				];
+				] as any;
 
-				const { convertCollectionFieldsToN8n } = require('../src/utils/directus');
-				convertCollectionFieldsToN8n.mockResolvedValue(mockFields);
+				vi.mocked(directusUtils.convertCollectionFieldsToN8n).mockResolvedValue(mockFields);
 
 				mockExecuteFunctions.getCurrentNodeParameter.mockReturnValue('users');
 
@@ -176,8 +191,7 @@ describe('Directus Node', () => {
 					},
 				];
 
-				const { getFieldsFromAPI } = require('../src/utils/api');
-				getFieldsFromAPI.mockResolvedValue(mockUserFields);
+				vi.mocked(apiUtils.getFieldsFromAPI).mockResolvedValue(mockUserFields);
 
 				const result = await node.methods!.loadOptions!.getUserFields.call(mockExecuteFunctions);
 
@@ -185,12 +199,14 @@ describe('Directus Node', () => {
 					{ name: 'First Name *', value: 'first_name', description: 'User first name' },
 					{ name: 'Last Name', value: 'last_name', description: 'User last name' },
 				]);
-				expect(getFieldsFromAPI).toHaveBeenCalledWith(mockExecuteFunctions, 'directus_users');
+				expect(apiUtils.getFieldsFromAPI).toHaveBeenCalledWith(
+					mockExecuteFunctions,
+					'directus_users',
+				);
 			});
 
 			it('should handle API errors', async () => {
-				const { getFieldsFromAPI } = require('../src/utils/api');
-				getFieldsFromAPI.mockRejectedValue(new Error('API Error'));
+				vi.mocked(apiUtils.getFieldsFromAPI).mockRejectedValue(new Error('API Error'));
 
 				await expect(
 					node.methods!.loadOptions!.getUserFields.call(mockExecuteFunctions),
@@ -239,8 +255,7 @@ describe('Directus Node', () => {
 					},
 				];
 
-				const { getFieldsFromAPI } = require('../src/utils/api');
-				getFieldsFromAPI.mockResolvedValue(mockFileFields);
+				vi.mocked(apiUtils.getFieldsFromAPI).mockResolvedValue(mockFileFields);
 
 				const result = await node.methods!.loadOptions!.getFileFields.call(mockExecuteFunctions);
 
@@ -248,12 +263,14 @@ describe('Directus Node', () => {
 					{ name: 'Title *', value: 'title', description: 'File title' },
 					{ name: 'Description', value: 'description', description: 'File description' },
 				]);
-				expect(getFieldsFromAPI).toHaveBeenCalledWith(mockExecuteFunctions, 'directus_files');
+				expect(apiUtils.getFieldsFromAPI).toHaveBeenCalledWith(
+					mockExecuteFunctions,
+					'directus_files',
+				);
 			});
 
 			it('should handle API errors', async () => {
-				const { getFieldsFromAPI } = require('../src/utils/api');
-				getFieldsFromAPI.mockRejectedValue(new Error('API Error'));
+				vi.mocked(apiUtils.getFieldsFromAPI).mockRejectedValue(new Error('API Error'));
 
 				await expect(
 					node.methods!.loadOptions!.getFileFields.call(mockExecuteFunctions),

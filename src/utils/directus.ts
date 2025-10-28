@@ -33,12 +33,7 @@ export interface Collection {
 
 import type { ILoadOptionsFunctions } from 'n8n-workflow';
 import { formatTitle as formatTitleUtil, createEnhancedItemLabel } from './format-title';
-import {
-	FALLBACK_DISPLAY_FIELDS,
-	SYSTEM_COLLECTION_PREFIX,
-	SYSTEM_FIELDS,
-	FIELD_TYPE_MAPPINGS,
-} from './constants';
+import { FALLBACK_DISPLAY_FIELDS, SYSTEM_COLLECTION_PREFIX, SYSTEM_FIELDS } from './constants';
 import {
 	DirectusCredentials,
 	getCollectionsFromAPI,
@@ -181,11 +176,32 @@ export function shouldSkipField(field: Field): boolean {
 		return true;
 	}
 
-	if ((field.meta as { locked?: boolean })?.locked) {
+	if (field.meta?.locked) {
 		return true;
 	}
 
-	if ((field.meta as { hidden?: boolean })?.hidden) {
+	if (field.meta?.hidden) {
+		return true;
+	}
+
+	if (field.type === 'alias') {
+		return true;
+	}
+
+	if (field.field?.startsWith('$')) {
+		return true;
+	}
+
+	return false;
+}
+
+// Check if field should be filtered for user/file operations
+export function shouldFilterField(field: Field, systemFields: string[]): boolean {
+	if (shouldSkipField(field)) {
+		return true;
+	}
+
+	if (systemFields.includes(field.field)) {
 		return true;
 	}
 
@@ -241,19 +257,22 @@ export function createFileField(n8nField: {
 	};
 }
 
-export function isSystemField(field: Field, isCreate = false): boolean {
+export function isSystemField(field: Field): boolean {
 	if (!field || !field.field) return false;
 
 	if (field.meta?.special?.includes('m2a')) return true;
 	if (field.type === 'alias') return true;
 	if (field.field.startsWith('$')) return true;
 
-	// In create mode, 'id' should not be considered a system field
-	if (!isCreate && field.field === 'id') {
+	// Always filter out 'id' field from the data payload
+	// - In CREATE mode: Directus auto-generates the ID
+	// - In UPDATE mode: The ID is specified separately in the 'itemId' parameter and used in the URL path
+	//   (e.g., PATCH /items/{collection}/{itemId}), not in the data payload
+	if (field.field === 'id') {
 		return true;
 	}
 
-	if (SYSTEM_FIELDS.COMMON.includes(field.field)) {
+	if (SYSTEM_FIELDS.COMMON_SYSTEM_FIELDS.includes(field.field)) {
 		return true;
 	}
 
@@ -278,24 +297,17 @@ export async function getCollections(functions: ILoadOptionsFunctions): Promise<
 export async function getFields(
 	functions: ILoadOptionsFunctions,
 	collection: string,
-	isCreate = false,
 ): Promise<Field[]> {
 	try {
 		const fields: Field[] = await getFieldsFromAPI(functions, collection);
 		fields.sort((a: Field, b: Field) => (a.meta?.sort ?? 0) - (b.meta?.sort ?? 0));
 
-		return fields.filter((field: Field) => !isSystemField(field, isCreate));
+		return fields.filter((field: Field) => !isSystemField(field));
 	} catch (error) {
 		throw new Error(
 			`Failed to fetch fields for collection '${collection}': ${formatDirectusError(error)}`,
 		);
 	}
-}
-
-// Remove duplicate function - use formatTitleUtil from format-title.ts
-
-export function getN8nFieldType(field: Field): string {
-	return FIELD_TYPE_MAPPINGS[field.type] || 'string';
 }
 
 // Convert a Directus field to a n8n field configuration
@@ -429,7 +441,7 @@ export async function convertCollectionFieldsToN8n(
 		options?: Array<{ name: string; value: string }>;
 	}>
 > {
-	const fields = await getFields(functions, collection, isCreate);
+	const fields = await getFields(functions, collection);
 
 	// Only fetch relations if we have relationship fields
 	const hasRelationshipFields = fields.some(isRelationshipField);
@@ -525,4 +537,15 @@ export function formatDirectusError(error: unknown): string {
 	if (errorObj.errors && Array.isArray(errorObj.errors))
 		return errorObj.errors.map((e: { message?: string }) => e.message).join(', ');
 	return 'An unknown error occurred';
+}
+
+// Helper to format display name from field
+export function formatDisplayName(field: {
+	field: string;
+	meta?: { display_name?: string };
+}): string {
+	return (
+		field.meta?.display_name ||
+		field.field.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())
+	);
 }

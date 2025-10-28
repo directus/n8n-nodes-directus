@@ -19,12 +19,15 @@
 		"declaration": true,
 		"sourceMap": true,
 		"skipLibCheck": true,
-		"outDir": "./dist/",
+		"outDir": "./dist/"
 	},
 	"include": [
 		"credentials/**/*",
 		"nodes/**/*",
 		"nodes/**/*.json",
 		"package.json",
-	],
+		"__tests__/**/*",
+		"src/**/*",
+		"vitest.config.ts"
+	]
 }
