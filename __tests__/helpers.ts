@@ -1,5 +1,20 @@
 import { vi } from 'vitest';
 
+export function mockDirectusCredentials() {
+	return {
+		url: 'https://test.directus.app',
+		token: 'test-token',
+	};
+}
+
+export function mockSuccessfulHttpRequest(data: any) {
+	return vi.fn<any>().mockResolvedValue({ data });
+}
+
+export function mockFailedHttpRequest(error: string) {
+	return vi.fn<any>().mockRejectedValue(new Error(error));
+}
+
 export function createMockExecuteFunctions(
 	options: {
 		nodeParameters: any;
@@ -14,7 +29,7 @@ export function createMockExecuteFunctions(
 		getCurrentNodeParameter: vi.fn((parameter: string) => {
 			return options.nodeParameters[parameter];
 		}),
-		getCredentials: vi.fn<any>().mockResolvedValue(options.credentials || {}),
+		getCredentials: vi.fn<any>().mockResolvedValue(options.credentials || mockDirectusCredentials()),
 		getInputData: vi.fn(() => {
 			return options.inputData || [{ json: {} }];
 		}),
@@ -69,7 +84,7 @@ export function createMockWebhookFunctions(
 				},
 			}),
 		},
-		getCredentials: vi.fn<any>().mockResolvedValue({}),
+		getCredentials: vi.fn<any>().mockResolvedValue(mockDirectusCredentials()),
 		getWorkflowStaticData: vi.fn(() => ({ flowId: undefined })),
 		getNode: vi.fn(() => ({
 			id: 'test-node-id',

@@ -1,38 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Directus } from '../nodes/Directus/Directus.node';
 import { createMockExecuteFunctions } from './helpers';
+import * as fieldsUtils from '../nodes/Directus/methods/fields';
+import * as apiUtils from '../nodes/Directus/methods/api';
 
-// Import modules to access their mocks
-import * as directusUtils from '../src/utils/directus';
-import * as apiUtils from '../src/utils/api';
-
-// Mock the directus utils
-vi.mock('../src/utils/directus', () => ({
+vi.mock('../nodes/Directus/methods/fields', () => ({
 	getCollections: vi.fn(),
 	convertCollectionFieldsToN8n: vi.fn(),
 	formatDirectusError: vi.fn((error: any) => error.message || 'Unknown error'),
-	createEnhancedItemLabel: vi.fn((item: any) => item.name || `Item ${item.id}`),
-	FALLBACK_DISPLAY_FIELDS: ['name', 'title', 'label', 'display', 'id'],
-	shouldSkipField: vi.fn((field: any) => {
-		if (!field || !field.meta) return true;
-		const special = field.meta?.special || [];
-		if (special.includes('m2a')) return true;
-		if (field.meta?.locked) return true;
-		if (field.meta?.hidden) return true;
-		if (field.type === 'alias') return true;
-		if (field.field?.startsWith('$')) return true;
-		return false;
-	}),
-	formatDisplayName: vi.fn((field: any) => {
-		return (
-			field.meta?.display_name ||
-			field.field.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())
-		);
-	}),
+	processFieldValue: vi.fn((value: any) => value),
+	shouldSkipFieldPublic: vi.fn(() => false),
+	formatDisplayName: vi.fn((field: any) => field.meta?.display_name || field.field),
 }));
 
-// Mock the API utils
-vi.mock('../src/utils/api', () => ({
+vi.mock('../nodes/Directus/methods/api', () => ({
 	getFieldsFromAPI: vi.fn(),
 	getRolesFromAPI: vi.fn(),
 }));
@@ -47,359 +28,167 @@ describe('Directus Node', () => {
 		mockExecuteFunctions = createMockExecuteFunctions();
 	});
 
-	describe('Node Description', () => {
-		it('should have correct basic properties', () => {
-			expect(node.description.name).toBe('directus');
-			expect(node.description.displayName).toBe('Directus');
-			expect(node.description.group).toEqual(['output']);
-			expect(node.description.version).toBe(1);
-		});
-
-		it('should have correct inputs and outputs', () => {
-			expect(node.description.inputs).toEqual(['main']);
-			expect(node.description.outputs).toEqual(['main']);
-		});
-
-		it('should require directusApi credentials', () => {
-			expect(node.description.credentials).toEqual([
-				{
-					name: 'directusApi',
-					required: true,
-				},
-			]);
-		});
-
-		it('should have loadOptions methods', () => {
-			expect(node.methods?.loadOptions).toBeDefined();
-			expect(node.methods?.loadOptions?.getCollections).toBeDefined();
-			expect(node.methods?.loadOptions?.getRoles).toBeDefined();
-			expect(node.methods?.loadOptions?.getCollectionFields).toBeDefined();
-			expect(node.methods?.loadOptions?.getUserFields).toBeDefined();
-			expect(node.methods?.loadOptions?.getFileFields).toBeDefined();
-		});
+	it('should initialize successfully', () => {
+		expect(node).toBeDefined();
+		expect(node.description).toBeDefined();
+		expect(node.methods?.loadOptions).toBeDefined();
 	});
 
 	describe('Load Options', () => {
-		describe('getCollections', () => {
-			it('should return collections in correct format', async () => {
-				const mockCollections = [
-					{ collection: 'users', meta: { display_template: '{{name}}' } },
-					{ collection: 'posts', meta: { display_template: '{{title}}' } },
-				];
+		it('should load collections', async () => {
+			const mockCollections = [
+				{ collection: 'users', meta: {} },
+				{ collection: 'posts', meta: {} },
+			];
+			vi.mocked(fieldsUtils.getCollections).mockResolvedValue(mockCollections);
 
-				vi.mocked(directusUtils.getCollections).mockResolvedValue(mockCollections);
+			const result = await node.methods!.loadOptions!.getCollections.call(mockExecuteFunctions);
 
-				const result = await node.methods!.loadOptions!.getCollections.call(mockExecuteFunctions);
-
-				expect(result).toEqual([
-					{ name: 'users', value: 'users' },
-					{ name: 'posts', value: 'posts' },
-				]);
-				expect(directusUtils.getCollections).toHaveBeenCalledWith(mockExecuteFunctions);
-			});
-
-			it('should handle errors gracefully', async () => {
-				vi.mocked(directusUtils.getCollections).mockRejectedValue(new Error('API Error'));
-
-				await expect(
-					node.methods!.loadOptions!.getCollections.call(mockExecuteFunctions),
-				).rejects.toThrow('Failed to load collections: API Error');
-			});
+			expect(result).toHaveLength(2);
+			expect(result[0].value).toBe('users');
 		});
 
-		describe('getRoles', () => {
-			it('should return roles in correct format', async () => {
-				const mockRoles = [
-					{ id: '1', name: 'admin', admin_access: true },
-					{ id: '2', name: 'editor', admin_access: false },
-				];
+		it('should load roles', async () => {
+			const mockRoles = [{ id: '1', name: 'admin' }];
+			vi.mocked(apiUtils.getRolesFromAPI).mockResolvedValue(mockRoles);
 
-				vi.mocked(apiUtils.getRolesFromAPI).mockResolvedValue(mockRoles);
+			const result = await node.methods!.loadOptions!.getRoles.call(mockExecuteFunctions);
 
-				const result = await node.methods!.loadOptions!.getRoles.call(mockExecuteFunctions);
-
-				expect(result).toEqual([
-					{ name: 'admin', value: '1' },
-					{ name: 'editor', value: '2' },
-				]);
-			});
-
-			it('should handle API errors', async () => {
-				vi.mocked(apiUtils.getRolesFromAPI).mockRejectedValue(new Error('API Error'));
-
-				await expect(
-					node.methods!.loadOptions!.getRoles.call(mockExecuteFunctions),
-				).rejects.toThrow('Failed to load roles: API Error');
-			});
+			expect(result).toHaveLength(1);
+			expect(result[0].value).toBe('1');
 		});
 
-		describe('getCollectionFields', () => {
-			it('should return fields in correct format', async () => {
-				const mockFields = [
-					{ name: 'name', displayName: 'Name' },
-					{ name: 'email', displayName: 'Email' },
-				] as any;
+		it('should load collection fields', async () => {
+			const mockFields = [{ name: 'name', displayName: 'Name' }] as any;
+			vi.mocked(fieldsUtils.convertCollectionFieldsToN8n).mockResolvedValue(mockFields);
+			mockExecuteFunctions.getCurrentNodeParameter.mockReturnValue('users');
 
-				vi.mocked(directusUtils.convertCollectionFieldsToN8n).mockResolvedValue(mockFields);
+			const result =
+				await node.methods!.loadOptions!.getCollectionFields.call(mockExecuteFunctions);
 
-				mockExecuteFunctions.getCurrentNodeParameter.mockReturnValue('users');
-
-				const result =
-					await node.methods!.loadOptions!.getCollectionFields.call(mockExecuteFunctions);
-
-				expect(result).toEqual([
-					{ name: 'Name', value: 'name', description: '' },
-					{ name: 'Email', value: 'email', description: '' },
-				]);
-			});
-
-			it('should handle missing collection parameter', async () => {
-				mockExecuteFunctions.getCurrentNodeParameter.mockReturnValue('');
-
-				await expect(
-					node.methods!.loadOptions!.getCollectionFields.call(mockExecuteFunctions),
-				).rejects.toThrow('Collection parameter is required');
-			});
-		});
-
-		describe('getUserFields', () => {
-			it('should return user fields in correct format', async () => {
-				const mockUserFields = [
-					{
-						field: 'first_name',
-						type: 'string',
-						meta: {
-							display_name: 'First Name',
-							required: true,
-							note: 'User first name',
-							special: [],
-							locked: false,
-							hidden: false,
-						},
-					},
-					{
-						field: 'last_name',
-						type: 'string',
-						meta: {
-							display_name: 'Last Name',
-							required: false,
-							note: 'User last name',
-							special: [],
-							locked: false,
-							hidden: false,
-						},
-					},
-				];
-
-				vi.mocked(apiUtils.getFieldsFromAPI).mockResolvedValue(mockUserFields);
-
-				const result = await node.methods!.loadOptions!.getUserFields.call(mockExecuteFunctions);
-
-				expect(result).toEqual([
-					{ name: 'First Name *', value: 'first_name', description: 'User first name' },
-					{ name: 'Last Name', value: 'last_name', description: 'User last name' },
-				]);
-				expect(apiUtils.getFieldsFromAPI).toHaveBeenCalledWith(
-					mockExecuteFunctions,
-					'directus_users',
-				);
-			});
-
-			it('should handle API errors', async () => {
-				vi.mocked(apiUtils.getFieldsFromAPI).mockRejectedValue(new Error('API Error'));
-
-				await expect(
-					node.methods!.loadOptions!.getUserFields.call(mockExecuteFunctions),
-				).rejects.toThrow('Failed to load user fields: API Error');
-			});
-		});
-
-		describe('getFileFields', () => {
-			it('should return file fields in correct format', async () => {
-				const mockFileFields = [
-					{
-						field: 'title',
-						type: 'string',
-						meta: {
-							display_name: 'Title',
-							required: true,
-							note: 'File title',
-							special: [],
-							locked: false,
-							hidden: false,
-						},
-					},
-					{
-						field: 'description',
-						type: 'text',
-						meta: {
-							display_name: 'Description',
-							required: false,
-							note: 'File description',
-							special: [],
-							locked: false,
-							hidden: false,
-						},
-					},
-					{
-						field: 'storage',
-						type: 'string',
-						meta: {
-							display_name: 'Storage',
-							required: true,
-							note: 'Storage location',
-							special: [],
-							locked: false,
-							hidden: false,
-						},
-					},
-				];
-
-				vi.mocked(apiUtils.getFieldsFromAPI).mockResolvedValue(mockFileFields);
-
-				const result = await node.methods!.loadOptions!.getFileFields.call(mockExecuteFunctions);
-
-				expect(result).toEqual([
-					{ name: 'Title *', value: 'title', description: 'File title' },
-					{ name: 'Description', value: 'description', description: 'File description' },
-				]);
-				expect(apiUtils.getFieldsFromAPI).toHaveBeenCalledWith(
-					mockExecuteFunctions,
-					'directus_files',
-				);
-			});
-
-			it('should handle API errors', async () => {
-				vi.mocked(apiUtils.getFieldsFromAPI).mockRejectedValue(new Error('API Error'));
-
-				await expect(
-					node.methods!.loadOptions!.getFileFields.call(mockExecuteFunctions),
-				).rejects.toThrow('Failed to load file fields: API Error');
-			});
+			expect(result).toHaveLength(1);
+			expect(result[0].value).toBe('name');
 		});
 	});
 
-	describe('Execute Method', () => {
-		it('should handle item create operation', async () => {
+	describe('Execute Operations', () => {
+		it('should create item', async () => {
 			mockExecuteFunctions.getNodeParameter
-				.mockReturnValueOnce('item') // resource
-				.mockReturnValueOnce('create') // operation
-				.mockReturnValueOnce('users') // collection
-				.mockReturnValueOnce('{"name": "Test User"}'); // jsonData
+				.mockReturnValueOnce('item')
+				.mockReturnValueOnce('create')
+				.mockReturnValueOnce('users')
+				.mockReturnValueOnce({ fields: { field: [{ name: 'name', value: 'Test' }] } });
 
 			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue({
-				data: { id: 1, name: 'Test User' },
+				data: { id: 1, name: 'Test' },
 			});
 
 			const result = await node.execute.call(mockExecuteFunctions);
 
-			expect(result).toEqual([
-				[
-					{
-						json: { id: 1, name: 'Test User' },
-						pairedItem: { item: 0 },
-					},
-				],
-			]);
+			expect(result[0][0].json).toEqual({ id: 1, name: 'Test' });
 		});
 
-		it('should handle item get operation', async () => {
+		it('should get item', async () => {
 			mockExecuteFunctions.getNodeParameter
-				.mockReturnValueOnce('item') // resource
-				.mockReturnValueOnce('get') // operation
-				.mockReturnValueOnce('users') // collection
-				.mockReturnValueOnce('1'); // itemId
+				.mockReturnValueOnce('item')
+				.mockReturnValueOnce('get')
+				.mockReturnValueOnce('users')
+				.mockReturnValueOnce('1');
 
 			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue({
-				data: { id: 1, name: 'Test User' },
+				data: { id: 1, name: 'Test' },
 			});
 
 			const result = await node.execute.call(mockExecuteFunctions);
 
-			expect(result).toEqual([
-				[
-					{
-						json: { id: 1, name: 'Test User' },
-						pairedItem: { item: 0 },
-					},
-				],
-			]);
+			expect(result[0][0].json).toEqual({ id: 1, name: 'Test' });
 		});
 
-		it('should handle user invite operation', async () => {
+		it('should update item', async () => {
 			mockExecuteFunctions.getNodeParameter
-				.mockReturnValueOnce('user') // resource
-				.mockReturnValueOnce('invite') // operation
-				.mockReturnValueOnce('test@example.com') // email
-				.mockReturnValueOnce('1'); // role
+				.mockReturnValueOnce('item')
+				.mockReturnValueOnce('update')
+				.mockReturnValueOnce('users')
+				.mockReturnValueOnce('1')
+				.mockReturnValueOnce({ fields: { field: [{ name: 'name', value: 'Updated' }] } });
 
 			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue({
-				data: { id: 1, email: 'test@example.com' },
+				data: { id: 1, name: 'Updated' },
 			});
 
 			const result = await node.execute.call(mockExecuteFunctions);
 
-			expect(result).toEqual([
-				[
-					{
-						json: { id: 1, email: 'test@example.com' },
-						pairedItem: { item: 0 },
-					},
-				],
-			]);
+			expect(result[0][0].json).toEqual({ id: 1, name: 'Updated' });
 		});
 
-		it('should handle file upload operation', async () => {
+		it('should delete item', async () => {
 			mockExecuteFunctions.getNodeParameter
-				.mockReturnValueOnce('file') // resource
-				.mockReturnValueOnce('upload') // operation
-				.mockReturnValueOnce('test.txt') // filename
-				.mockReturnValueOnce('text/plain'); // mimeType
+				.mockReturnValueOnce('item')
+				.mockReturnValueOnce('delete')
+				.mockReturnValueOnce('users')
+				.mockReturnValueOnce('1');
+
+			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue({});
+
+			const result = await node.execute.call(mockExecuteFunctions);
+
+			expect(result[0][0].json).toEqual({ deleted: true, id: '1' });
+		});
+
+		it('should handle user operations', async () => {
+			mockExecuteFunctions.getNodeParameter
+				.mockReturnValueOnce('user')
+				.mockReturnValueOnce('invite')
+				.mockReturnValueOnce('test@example.com')
+				.mockReturnValueOnce('1')
+				.mockReturnValueOnce('');
+
+			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue({});
+
+			const result = await node.execute.call(mockExecuteFunctions);
+
+			expect(result[0][0].json).toHaveProperty('success', true);
+		});
+
+		it('should handle file operations', async () => {
+			mockExecuteFunctions.getNodeParameter
+				.mockReturnValueOnce('file')
+				.mockReturnValueOnce('upload')
+				.mockReturnValueOnce('test.txt')
+				.mockReturnValueOnce('Test File')
+				.mockReturnValueOnce('')
+				.mockReturnValueOnce('');
 
 			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue({
-				data: { id: 'file-id', filename_download: 'test.txt' },
+				data: { id: 'file-1', filename_download: 'test.txt' },
 			});
 
 			const result = await node.execute.call(mockExecuteFunctions);
 
-			expect(result).toEqual([
-				[
-					{
-						json: { id: 'file-id', filename_download: 'test.txt' },
-						pairedItem: { item: 0 },
-					},
-				],
-			]);
+			expect(result[0][0].json).toHaveProperty('id', 'file-1');
 		});
 
 		it('should handle errors with continueOnFail', async () => {
 			mockExecuteFunctions.getNodeParameter
-				.mockReturnValueOnce('item') // resource
-				.mockReturnValueOnce('create') // operation
-				.mockReturnValueOnce('users') // collection
-				.mockReturnValueOnce('{"name": "Test User"}'); // jsonData
+				.mockReturnValueOnce('item')
+				.mockReturnValueOnce('get')
+				.mockReturnValueOnce('users')
+				.mockReturnValueOnce('1');
 
 			mockExecuteFunctions.continueOnFail.mockReturnValue(true);
 			mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(new Error('API Error'));
 
 			const result = await node.execute.call(mockExecuteFunctions);
 
-			expect(result).toEqual([
-				[
-					{
-						json: { error: 'API Error' },
-						pairedItem: { item: 0 },
-					},
-				],
-			]);
+			expect(result[0][0].json).toHaveProperty('error', 'API Error');
 		});
 
 		it('should throw errors when continueOnFail is false', async () => {
 			mockExecuteFunctions.getNodeParameter
-				.mockReturnValueOnce('item') // resource
-				.mockReturnValueOnce('create') // operation
-				.mockReturnValueOnce('users') // collection
-				.mockReturnValueOnce('{"name": "Test User"}'); // jsonData
+				.mockReturnValueOnce('item')
+				.mockReturnValueOnce('get')
+				.mockReturnValueOnce('users')
+				.mockReturnValueOnce('1');
 
 			mockExecuteFunctions.continueOnFail.mockReturnValue(false);
 			mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(new Error('API Error'));

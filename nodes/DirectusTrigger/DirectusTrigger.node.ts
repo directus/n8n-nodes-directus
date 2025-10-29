@@ -11,7 +11,7 @@ import {
 	INodeExecutionData,
 } from 'n8n-workflow';
 
-import { getCollections } from '../../src/utils/directus';
+import { getCollections } from '../Directus/methods/fields';
 
 export class DirectusTrigger implements INodeType {
 	description: INodeTypeDescription = {

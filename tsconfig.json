@@ -27,7 +27,7 @@
 		"nodes/**/*.json",
 		"package.json",
 		"__tests__/**/*",
-		"src/**/*",
+		"utils/**/*",
 		"vitest.config.ts"
 	]
 }

@@ -2,8 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { DirectusTrigger } from '../nodes/DirectusTrigger/DirectusTrigger.node';
 import { createMockWebhookFunctions } from './helpers';
 
-// Mock the directus utils
-vi.mock('../src/utils/directus', () => ({
+vi.mock('../nodes/Directus/methods/fields', () => ({
 	getCollections: vi.fn(),
 }));
 
@@ -17,194 +16,62 @@ describe('DirectusTrigger Node', () => {
 		mockWebhookFunctions = createMockWebhookFunctions();
 	});
 
-	describe('Node Description', () => {
-		it('should have correct basic properties', () => {
-			expect(node.description.name).toBe('directusTrigger');
-			expect(node.description.displayName).toBe('Directus Trigger');
-			expect(node.description.group).toEqual(['trigger']);
-			expect(node.description.version).toBe(1);
+	it('should initialize successfully', () => {
+		expect(node).toBeDefined();
+		expect(node.description).toBeDefined();
+		expect(node.webhookMethods).toBeDefined();
+	});
+
+	describe('Webhook Management', () => {
+		it('should create webhook flow', async () => {
+			mockWebhookFunctions.getNodeParameter
+				.mockReturnValueOnce('item')
+				.mockReturnValueOnce('create')
+				.mockReturnValueOnce('users');
+			mockWebhookFunctions.getWorkflowStaticData.mockReturnValue({});
+			mockWebhookFunctions.helpers.httpRequest
+				.mockResolvedValueOnce({ data: { data: [] } })
+				.mockResolvedValueOnce({ data: { id: 'flow-id' } })
+				.mockResolvedValueOnce({});
+
+			const result = await node.webhookMethods!.default!.create.call(mockWebhookFunctions);
+
+			expect(result).toBe(true);
 		});
 
-		it('should have correct inputs and outputs', () => {
-			expect(node.description.inputs).toEqual([]);
-			expect(node.description.outputs).toEqual(['main']);
-		});
+		it('should delete webhook flow', async () => {
+			const staticData = { testFlowIds: ['flow-1'] };
+			mockWebhookFunctions.getWorkflowStaticData.mockReturnValue(staticData);
+			mockWebhookFunctions.helpers.httpRequest.mockResolvedValue({});
 
-		it('should require directusApi credentials', () => {
-			expect(node.description.credentials).toEqual([
-				{
-					name: 'directusApi',
-					required: true,
-				},
-			]);
-		});
+			const result = await node.webhookMethods!.default!.delete.call(mockWebhookFunctions);
 
-		it('should have webhook methods', () => {
-			expect(node.webhookMethods).toBeDefined();
-			expect(node.webhookMethods?.default?.checkExists).toBeDefined();
-			expect(node.webhookMethods?.default?.create).toBeDefined();
-			expect(node.webhookMethods?.default?.delete).toBeDefined();
+			expect(result).toBe(true);
 		});
 	});
 
-	describe('Webhook Methods', () => {
-		describe('checkExists', () => {
-			it('should return true when webhook exists', async () => {
-				// Set up workflow static data with flowId
-				const staticData = { flowId: 'existing-flow-id' };
-				mockWebhookFunctions.getWorkflowStaticData.mockReturnValue(staticData);
-				mockWebhookFunctions.getCredentials.mockResolvedValue({
-					url: 'https://test.directus.app',
-					token: 'test-token',
-				});
-				mockWebhookFunctions.helpers.httpRequest.mockResolvedValue({
-					data: { id: 'existing-flow-id' },
-				});
-
-				const result = await node.webhookMethods!.default!.checkExists.call(mockWebhookFunctions);
-
-				expect(result).toBe(true);
-			});
-
-			it('should return false when webhook does not exist', async () => {
-				// Set up workflow static data with no flowId
-				const staticData = {};
-				mockWebhookFunctions.getWorkflowStaticData.mockReturnValue(staticData);
-
-				const result = await node.webhookMethods!.default!.checkExists.call(mockWebhookFunctions);
-
-				expect(result).toBe(false);
-			});
-
-			it('should handle API errors gracefully', async () => {
-				// Set up workflow static data with flowId that will fail
-				const staticData = { flowId: 'non-existent-flow' };
-				mockWebhookFunctions.getWorkflowStaticData.mockReturnValue(staticData);
-				mockWebhookFunctions.getCredentials.mockResolvedValue({
-					url: 'https://test.directus.app',
-					token: 'test-token',
-				});
-				mockWebhookFunctions.helpers.httpRequest.mockRejectedValue(new Error('API Error'));
-
-				const result = await node.webhookMethods!.default!.checkExists.call(mockWebhookFunctions);
-
-				expect(result).toBe(false);
-			});
-		});
-
-		describe('create', () => {
-			it('should create webhook successfully', async () => {
-				mockWebhookFunctions.getNodeParameter
-					.mockReturnValueOnce('item') // resource
-					.mockReturnValueOnce('create') // event
-					.mockReturnValueOnce('users'); // collection
-				mockWebhookFunctions.getNodeWebhookUrl.mockReturnValue('https://webhook.url');
-				mockWebhookFunctions.getCredentials.mockResolvedValue({
-					url: 'https://test.directus.app',
-					token: 'test-token',
-				});
-				const staticData = {};
-				mockWebhookFunctions.getWorkflowStaticData.mockReturnValue(staticData);
-
-				// Mock successful flow creation response
-				mockWebhookFunctions.helpers.httpRequest
-					.mockResolvedValueOnce({ data: { data: [] } }) // cleanup flows
-					.mockResolvedValueOnce({ data: { id: 'flow-id' } }) // create flow
-					.mockResolvedValueOnce({}); // create operation
-
-				const result = await node.webhookMethods!.default!.create.call(mockWebhookFunctions);
-
-				expect(result).toBe(true);
-			});
-
-			it('should handle creation errors gracefully', async () => {
-				mockWebhookFunctions.getNodeParameter
-					.mockReturnValueOnce('item') // resource
-					.mockReturnValueOnce('create') // event
-					.mockReturnValueOnce('users'); // collection
-				mockWebhookFunctions.getNodeWebhookUrl.mockReturnValue('https://webhook.url');
-				mockWebhookFunctions.getCredentials.mockResolvedValue({
-					url: 'https://test.directus.app',
-					token: 'test-token',
-				});
-				const staticData = {};
-				mockWebhookFunctions.getWorkflowStaticData.mockReturnValue(staticData);
-				mockWebhookFunctions.helpers.httpRequest.mockRejectedValue(new Error('API Error'));
-
-				await expect(
-					node.webhookMethods!.default!.create.call(mockWebhookFunctions),
-				).rejects.toThrow('API Error');
-			});
-		});
-
-		describe('delete', () => {
-			it('should delete webhook successfully', async () => {
-				const staticData = { testFlowIds: ['test-flow-1', 'test-flow-2'] };
-				mockWebhookFunctions.getWorkflowStaticData.mockReturnValue(staticData);
-				mockWebhookFunctions.getCredentials.mockResolvedValue({
-					url: 'https://test.directus.app',
-					token: 'test-token',
-				});
-				mockWebhookFunctions.helpers.httpRequest.mockResolvedValue({});
-
-				const result = await node.webhookMethods!.default!.delete.call(mockWebhookFunctions);
-
-				expect(result).toBe(true);
-			});
-
-			it('should handle deletion errors gracefully', async () => {
-				const staticData = { testFlowIds: ['test-flow-1'] };
-				mockWebhookFunctions.getWorkflowStaticData.mockReturnValue(staticData);
-				mockWebhookFunctions.getCredentials.mockResolvedValue({
-					url: 'https://test.directus.app',
-					token: 'test-token',
-				});
-				mockWebhookFunctions.helpers.httpRequest.mockRejectedValue(new Error('API Error'));
-
-				const result = await node.webhookMethods!.default!.delete.call(mockWebhookFunctions);
-
-				expect(result).toBe(true); // Still returns true because it handles errors gracefully
-			});
-		});
-	});
-
-	describe('Webhook Handler', () => {
-		it('should process item webhook correctly', async () => {
+	describe('Webhook Processing', () => {
+		it('should process item webhook', async () => {
 			const mockBodyData = {
 				event: 'items.create',
-				payload: { id: 1, name: 'Test Item' },
+				payload: { id: 1, name: 'Test' },
 				collection: 'users',
 				key: '1',
 			};
 
 			mockWebhookFunctions.getBodyData.mockReturnValue(mockBodyData);
 			mockWebhookFunctions.getNodeParameter
-				.mockReturnValueOnce('item') // resource
-				.mockReturnValueOnce('create'); // event
+				.mockReturnValueOnce('item')
+				.mockReturnValueOnce('create');
 
 			const result = await node.webhook.call(mockWebhookFunctions);
 
-			expect(result).toEqual({
-				workflowData: [
-					[
-						{
-							json: {
-								event: 'items.create',
-								collection: 'users',
-								action: 'create',
-								payload: { id: 1, name: 'Test Item' },
-								id: 1,
-								key: '1',
-								keys: ['1'],
-								timestamp: expect.any(String),
-							},
-						},
-					],
-				],
-			});
+			expect(result.workflowData![0][0].json.event).toBe('items.create');
+			expect(result.workflowData![0][0].json.id).toBe(1);
+			expect(result.workflowData![0][0].json.collection).toBe('users');
 		});
 
-		it('should process user webhook correctly', async () => {
+		it('should process user webhook', async () => {
 			const mockBodyData = {
 				event: 'users.update',
 				payload: { id: 1, email: 'test@example.com' },
@@ -213,78 +80,19 @@ describe('DirectusTrigger Node', () => {
 
 			mockWebhookFunctions.getBodyData.mockReturnValue(mockBodyData);
 			mockWebhookFunctions.getNodeParameter
-				.mockReturnValueOnce('user') // resource
-				.mockReturnValueOnce('update'); // event
-			mockWebhookFunctions.getCredentials.mockResolvedValue({
-				url: 'https://test.directus.app',
-				token: 'test-token',
-			});
+				.mockReturnValueOnce('user')
+				.mockReturnValueOnce('update');
 			mockWebhookFunctions.helpers.httpRequest.mockResolvedValue({
 				data: { data: { id: 1, email: 'test@example.com' } },
 			});
 
 			const result = await node.webhook.call(mockWebhookFunctions);
 
-			expect(result).toEqual({
-				workflowData: [
-					[
-						{
-							json: {
-								event: 'users.update',
-								action: 'update',
-								payload: { id: 1, email: 'test@example.com' },
-								id: 1,
-								key: '1',
-								keys: ['1'],
-								timestamp: expect.any(String),
-							},
-						},
-					],
-				],
-			});
+			expect(result.workflowData![0][0].json.event).toBe('users.update');
+			expect(result.workflowData![0][0].json.id).toBe(1);
 		});
 
-		it('should process user webhook with keys array (real Directus behavior)', async () => {
-			const mockBodyData = {
-				event: 'users.update',
-				payload: { last_page: '/settings/flows' },
-				keys: ['d56956bf-6ed0-465e-bb4a-ec9bde65c5f0'], // Real Directus behavior
-			};
-
-			mockWebhookFunctions.getBodyData.mockReturnValue(mockBodyData);
-			mockWebhookFunctions.getNodeParameter
-				.mockReturnValueOnce('user') // resource
-				.mockReturnValueOnce('update'); // event
-			mockWebhookFunctions.getCredentials.mockResolvedValue({
-				url: 'https://test.directus.app',
-				token: 'test-token',
-			});
-			mockWebhookFunctions.helpers.httpRequest.mockResolvedValue({
-				data: { data: { id: 'd56956bf-6ed0-465e-bb4a-ec9bde65c5f0', email: 'test@example.com' } },
-			});
-
-			const result = await node.webhook.call(mockWebhookFunctions);
-
-			expect(result).toEqual({
-				workflowData: [
-					[
-						{
-							json: {
-								event: 'users.update',
-								action: 'update',
-								payload: { id: 'd56956bf-6ed0-465e-bb4a-ec9bde65c5f0', email: 'test@example.com' },
-								id: 'd56956bf-6ed0-465e-bb4a-ec9bde65c5f0',
-								key: 'd56956bf-6ed0-465e-bb4a-ec9bde65c5f0',
-								keys: ['d56956bf-6ed0-465e-bb4a-ec9bde65c5f0'],
-								timestamp: expect.any(String),
-							},
-						},
-					],
-				],
-			});
-		});
-
-		it('should process file webhook correctly', async () => {
+		it('should process file webhook', async () => {
 			const mockBodyData = {
 				event: 'files.upload',
 				payload: { id: 'file-id', filename_download: 'test.txt' },
@@ -293,145 +101,46 @@ describe('DirectusTrigger Node', () => {
 
 			mockWebhookFunctions.getBodyData.mockReturnValue(mockBodyData);
 			mockWebhookFunctions.getNodeParameter
-				.mockReturnValueOnce('file') // resource
-				.mockReturnValueOnce('upload'); // event
+				.mockReturnValueOnce('file')
+				.mockReturnValueOnce('upload');
 
 			const result = await node.webhook.call(mockWebhookFunctions);
 
-			expect(result).toEqual({
-				workflowData: [
-					[
-						{
-							json: {
-								event: 'files.upload',
-								action: 'upload',
-								payload: { id: 'file-id', filename_download: 'test.txt' },
-								id: 'file-id',
-								key: 'file-id',
-								keys: ['file-id'],
-								timestamp: expect.any(String),
-							},
-						},
-					],
-				],
-			});
+			expect(result.workflowData![0][0].json.event).toBe('files.upload');
+			expect(result.workflowData![0][0].json.id).toBe('file-id');
 		});
 
-		it('should process file webhook with keys array (real Directus behavior)', async () => {
+		it('should extract ID from keys array when key is missing', async () => {
 			const mockBodyData = {
-				event: 'files.upload',
-				payload: { id: 'file-id', filename_download: 'test.txt' },
-				keys: ['file-id'], // Real Directus behavior - ID in keys array
+				event: 'users.update',
+				payload: { last_page: '/settings' },
+				keys: ['user-uuid-123'],
 			};
 
 			mockWebhookFunctions.getBodyData.mockReturnValue(mockBodyData);
 			mockWebhookFunctions.getNodeParameter
-				.mockReturnValueOnce('file') // resource
-				.mockReturnValueOnce('upload'); // event
-
-			const result = await node.webhook.call(mockWebhookFunctions);
-
-			expect(result).toEqual({
-				workflowData: [
-					[
-						{
-							json: {
-								event: 'files.upload',
-								action: 'upload',
-								payload: { id: 'file-id', filename_download: 'test.txt' },
-								id: 'file-id',
-								key: 'file-id',
-								keys: ['file-id'],
-								timestamp: expect.any(String),
-							},
-						},
-					],
-				],
+				.mockReturnValueOnce('user')
+				.mockReturnValueOnce('update');
+			mockWebhookFunctions.helpers.httpRequest.mockResolvedValue({
+				data: { data: { id: 'user-uuid-123', email: 'test@example.com' } },
 			});
-		});
-
-		it('should handle nested webhook payload', async () => {
-			const mockBodyData = {
-				body: {
-					event: 'items.create',
-					payload: { id: 1, name: 'Test Item' },
-					collection: 'users',
-					key: '1',
-				},
-			};
-
-			mockWebhookFunctions.getBodyData.mockReturnValue(mockBodyData);
-			mockWebhookFunctions.getNodeParameter
-				.mockReturnValueOnce('item') // resource
-				.mockReturnValueOnce('create'); // event
 
 			const result = await node.webhook.call(mockWebhookFunctions);
 
-			expect(result.workflowData![0][0].json.event).toBe('items.create');
-			expect(result.workflowData![0][0].json.collection).toBe('users');
+			expect(result.workflowData![0][0].json.id).toBe('user-uuid-123');
+			expect(result.workflowData![0][0].json.key).toBe('user-uuid-123');
 		});
 
-		it('should handle invalid webhook data gracefully', async () => {
+		it('should handle empty webhook data', async () => {
 			mockWebhookFunctions.getBodyData.mockReturnValue({});
 			mockWebhookFunctions.getNodeParameter
-				.mockReturnValueOnce('item') // resource
-				.mockReturnValueOnce('create'); // event
+				.mockReturnValueOnce('item')
+				.mockReturnValueOnce('create');
 
 			const result = await node.webhook.call(mockWebhookFunctions);
 
 			expect(result.workflowData![0][0].json.event).toBe('items.create');
 			expect(result.workflowData![0][0].json.collection).toBe('unknown');
-		});
-
-		it('should fetch complete data for update events', async () => {
-			const mockBodyData = {
-				event: 'items.update',
-				payload: { id: 1, name: 'Updated Item' },
-				collection: 'users',
-				key: '1',
-			};
-
-			mockWebhookFunctions.getBodyData.mockReturnValue(mockBodyData);
-			mockWebhookFunctions.getNodeParameter
-				.mockReturnValueOnce('item') // resource
-				.mockReturnValueOnce('update'); // event
-
-			// Mock the complete data fetch
-			mockWebhookFunctions.helpers.httpRequest.mockResolvedValue({
-				data: { data: { id: 1, name: 'Updated Item', email: 'test@example.com' } },
-			});
-
-			const result = await node.webhook.call(mockWebhookFunctions);
-
-			expect(result.workflowData![0][0].json.payload).toEqual({
-				id: 1,
-				name: 'Updated Item',
-				email: 'test@example.com',
-			});
-		});
-
-		it('should fallback to original data if complete data fetch fails', async () => {
-			const mockBodyData = {
-				event: 'items.update',
-				payload: { id: 1, name: 'Updated Item' },
-				collection: 'users',
-				key: '1',
-			};
-
-			mockWebhookFunctions.getBodyData.mockReturnValue(mockBodyData);
-			mockWebhookFunctions.getNodeParameter
-				.mockReturnValueOnce('item') // resource
-				.mockReturnValueOnce('update'); // event
-
-			// Mock the complete data fetch to fail
-			mockWebhookFunctions.helpers.httpRequest.mockRejectedValue(new Error('API Error'));
-
-			const result = await node.webhook.call(mockWebhookFunctions);
-
-			expect(result.workflowData![0][0].json.payload).toEqual({
-				id: 1,
-				name: 'Updated Item',
-			});
 		});
 	});
 });

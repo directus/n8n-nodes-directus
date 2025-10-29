@@ -88,7 +88,7 @@ This project uses the official n8n-node CLI tool for development and follows n8n
 ### Prerequisites
 
 - **Node.js 22+**
-- **pnpm 8+** (recommended) or npm/yarn
+- **npm 10+**
 - **Directus instance** for testing (cloud or self-hosted)
 - **ngrok** (for webhook testing) - install from [ngrok.com](https://ngrok.com/)
 
@@ -100,11 +100,10 @@ git clone https://github.com/directus/n8n-nodes-directus.git
 cd n8n-nodes-directus
 
 # Install dependencies
-pnpm install
-
+npm install
 
 # Build the project
-pnpm build
+npm run build
 ```
 
 ### Quick Start
@@ -112,7 +111,7 @@ pnpm build
 1. **Start n8n with your node loaded**:
 
    ```bash
-   pnpm dev:n8n
+   npm run dev:n8n
    ```
 
    This will:
@@ -131,9 +130,8 @@ pnpm build
 ### Project Structure
 
 ```
-├── credentials/           # Directus API credentials
+├── credentials/         # Directus API credentials
 ├── nodes/               # n8n nodes (Directus and DirectusTrigger)
-├── src/                 # Shared utilities and helpers
 ├── __tests__/           # Test files
 ├── dist/                # Built/compiled files (generated)
 └── package.json         # Package configuration
@@ -142,26 +140,29 @@ pnpm build
 ### Available Commands
 
 ```bash
-# Development (replace pnpm with npm if using npm)
-pnpm build         # Build the project (TypeScript compilation + assets)
-pnpm dev           # Watch mode for TypeScript compilation
-pnpm dev:n8n       # Start n8n with your node loaded for testing
-pnpm build:n8n     # Build nodes and credentials using n8n-node CLI
+# Development
+npm run build        # Build the project (TypeScript compilation + assets)
+npm run dev          # Watch mode for TypeScript compilation
+npm run dev:n8n      # Start n8n with your node loaded for testing
+npm run build:n8n    # Build nodes and credentials using n8n-node CLI
+
+# Docker
+npm run docker:dev   # Start n8n in Docker for testing
+npm run docker:down  # Stop n8n Docker containers
+npm run docker:logs  # View n8n Docker logs
 
 # Code Quality
-pnpm lint          # Check code style (nodes, credentials, package.json)
-pnpm lintfix       # Fix code style issues (nodes, credentials, package.json)
-pnpm lint:n8n      # Check code style using n8n-node CLI
-pnpm lintfix:n8n   # Fix code style issues using n8n-node CLI
-pnpm format        # Format code using Prettier
+npm run lint         # Check code style (repo root; tests are ignored by config)
+npm run lintfix      # Fix code style issues
+npm run format       # Format code using Prettier
 
 # Testing
-pnpm test            # Run test suite
-pnpm test:watch      # Run tests in watch mode
-pnpm test:coverage   # Run tests with coverage report
+npm run test          # Run test suite
+npm run test:watch    # Run tests in watch mode
+npm run test:coverage # Run tests with coverage report
 
 # Publishing
-pnpm release         # Publish to npm using n8n-node CLI
+npm run release       # Publish to npm using n8n-node CLI
 ```
 
 ### Testing
@@ -171,7 +172,7 @@ pnpm release         # Publish to npm using n8n-node CLI
 1. **Start n8n with your node loaded**:
 
    ```bash
-   pnpm dev:n8n
+   npm run dev:n8n
    ```
 
 2. **Access n8n**: Open http://localhost:5678 in your browser
@@ -202,7 +203,7 @@ For testing the **Directus Trigger** node, you need to expose n8n via a public U
 2. **Start n8n** (in one terminal):
 
    ```bash
-   pnpm dev:n8n
+   npm run dev:n8n
    ```
 
 3. **Start ngrok** (in another terminal):
@@ -241,8 +242,8 @@ For testing the **Directus Trigger** node, you need to expose n8n via a public U
    - Check if port 5678 is available
 
 2. **Node not appearing in n8n**:
-   - Run `pnpm build` first
-   - Restart `pnpm dev:n8n`
+   - Run `npm run build` first
+   - Restart `npm run dev:n8n`
    - Check the terminal for any error messages
 
 3. **Webhook not triggering**:
@@ -252,8 +253,8 @@ For testing the **Directus Trigger** node, you need to expose n8n via a public U
    - Test the ngrok URL directly in browser
 
 4. **Build errors**:
-   - Run `pnpm lint` to check for code issues
-   - Run `pnpm lintfix` to auto-fix issues
+   - Run `npm run lint` to check for code issues
+   - Run `npm run lintfix` to auto-fix issues
    - Ensure TypeScript compilation passes
 
 #### Getting Help

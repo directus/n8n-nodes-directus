@@ -4,22 +4,28 @@ import {
 	INodeType,
 	INodeTypeDescription,
 	NodeOperationError,
-	ILoadOptionsFunctions,
 	IHttpRequestOptions,
 	IDataObject,
 } from 'n8n-workflow';
 
+import { formatDirectusError } from './methods/fields';
+import { itemOperations } from './resources/item/item.operations';
+import { userOperations } from './resources/user/user.operations';
+import { fileOperations } from './resources/file/file.operations';
+import { itemFields } from './resources/item/item.fields';
+import { userFields } from './resources/user/user.fields';
+import { fileFields } from './resources/file/file.fields';
+import { sharedFields } from './resources/sharedFields';
+import { executeItemOperations } from './resources/item/item.execute';
+import { executeUserOperations } from './resources/user/user.execute';
+import { executeFileOperations } from './resources/file/file.execute';
 import {
-	getCollections,
-	formatDirectusError,
-	convertCollectionFieldsToN8n,
-	processFieldValue,
-	shouldSkipField,
-	formatDisplayName,
-} from '../../src/utils/directus';
-import { getFieldsFromAPI, getRolesFromAPI } from '../../src/utils/api';
-import { SYSTEM_FIELDS } from '../../src/utils/constants';
-import { directusFields } from './DirectusDescription';
+	getCollectionsLoadOptions,
+	getCollectionFieldsLoadOptions,
+	getRolesLoadOptions,
+	getUserFieldsLoadOptions,
+	getFileFieldsLoadOptions,
+} from './methods/loadOptions';
 
 export class Directus implements INodeType {
 	description: INodeTypeDescription = {
@@ -42,126 +48,45 @@ export class Directus implements INodeType {
 				required: true,
 			},
 		],
-		properties: directusFields,
+		properties: [
+			{
+				displayName: 'Resource',
+				name: 'resource',
+				type: 'options',
+				noDataExpression: true,
+				options: [
+					{
+						name: 'Item',
+						value: 'item',
+					},
+					{
+						name: 'User',
+						value: 'user',
+					},
+					{
+						name: 'File',
+						value: 'file',
+					},
+				],
+				default: 'item',
+			},
+			...itemOperations,
+			...userOperations,
+			...fileOperations,
+			...itemFields,
+			...userFields,
+			...fileFields,
+			...sharedFields,
+		],
 	};
 
 	methods = {
 		loadOptions: {
-			async getCollections(
-				this: ILoadOptionsFunctions,
-			): Promise<Array<{ name: string; value: string }>> {
-				try {
-					const collections = await getCollections(this);
-					return collections.map((collection) => ({
-						name: collection.collection,
-						value: collection.collection,
-					}));
-				} catch (error) {
-					throw new NodeOperationError(
-						this.getNode(),
-						`Failed to load collections: ${error instanceof Error ? error.message : String(error)}`,
-					);
-				}
-			},
-			async getCollectionFields(
-				this: ILoadOptionsFunctions,
-			): Promise<Array<{ name: string; value: string }>> {
-				try {
-					const collection = this.getCurrentNodeParameter('collection') as string;
-					const operation = this.getCurrentNodeParameter('operation') as string;
-					const isCreate = operation === 'create';
-
-					if (!collection) {
-						throw new NodeOperationError(this.getNode(), 'Collection parameter is required');
-					}
-
-					const fields = await convertCollectionFieldsToN8n(this, collection, isCreate);
-					return fields.map((field) => ({
-						name: field.displayName,
-						value: field.name,
-						description: field.description || '',
-					}));
-				} catch (error) {
-					throw new NodeOperationError(
-						this.getNode(),
-						`Failed to load fields: ${error instanceof Error ? error.message : String(error)}`,
-					);
-				}
-			},
-			async getRoles(this: ILoadOptionsFunctions): Promise<Array<{ name: string; value: string }>> {
-				try {
-					const roles = await getRolesFromAPI(this);
-					return roles.map((role: { name?: string; id: string }) => ({
-						name: role.name || role.id,
-						value: role.id,
-					}));
-				} catch (error) {
-					throw new NodeOperationError(
-						this.getNode(),
-						`Failed to load roles: ${error instanceof Error ? error.message : String(error)}`,
-					);
-				}
-			},
-			async getUserFields(
-				this: ILoadOptionsFunctions,
-			): Promise<Array<{ name: string; value: string }>> {
-				try {
-					const fields = await getFieldsFromAPI(this, 'directus_users');
-					const systemFields = [
-						...SYSTEM_FIELDS.COMMON_SYSTEM_FIELDS,
-						...SYSTEM_FIELDS.USER_SPECIFIC_FIELDS,
-					];
-					const editableFields = fields.filter((field) => !shouldSkipField(field));
-
-					return editableFields
-						.filter((field) => !systemFields.includes(field.field))
-						.map((field) => {
-							const displayName = formatDisplayName(field);
-							const isRequired = field.meta?.required ?? false;
-
-							return {
-								name: isRequired ? `${displayName} *` : displayName,
-								value: field.field,
-								description: field.meta?.note || '',
-							};
-						});
-				} catch (error) {
-					throw new NodeOperationError(
-						this.getNode(),
-						`Failed to load user fields: ${error instanceof Error ? error.message : String(error)}`,
-					);
-				}
-			},
-			async getFileFields(
-				this: ILoadOptionsFunctions,
-			): Promise<Array<{ name: string; value: string }>> {
-				try {
-					const fields = await getFieldsFromAPI(this, 'directus_files');
-					const systemFields = [
-						...SYSTEM_FIELDS.COMMON_SYSTEM_FIELDS,
-						...SYSTEM_FIELDS.FILE_SPECIFIC_FIELDS,
-					];
-					const editableFields = fields.filter((field) => !shouldSkipField(field));
-
-					return editableFields
-						.filter((field) => !systemFields.includes(field.field))
-						.map((field) => {
-							const displayName = formatDisplayName(field);
-							const isRequired = field.meta?.required ?? false;
-
-							return {
-								name: isRequired ? `${displayName} *` : displayName,
-								value: field.field,
-								description: field.meta?.note || '',
-							};
-						});
-				} catch (error) {
-					throw new NodeOperationError(
-						this.getNode(),
-						`Failed to load file fields: ${error instanceof Error ? error.message : String(error)}`,
-					);
-				}
-			},
+			getCollections: getCollectionsLoadOptions,
+			getCollectionFields: getCollectionFieldsLoadOptions,
+			getRoles: getRolesLoadOptions,
+			getUserFields: getUserFieldsLoadOptions,
+			getFileFields: getFileFieldsLoadOptions,
 		},
 	};
 
@@ -194,312 +119,20 @@ export class Directus implements INodeType {
 
 				let responseData: unknown;
 
+				// Dispatch to appropriate resource handler
 				if (resource === 'item') {
 					const collection = this.getNodeParameter('collection', i) as string;
-
-					switch (operation) {
-						case 'create': {
-							const collectionFields = this.getNodeParameter('collectionFields', i) as {
-								fields?: { field?: Array<{ name: string; value: unknown }> };
-							};
-							const inputData = items[i].json;
-
-							const body: Record<string, unknown> =
-								inputData.payload && typeof inputData.payload === 'object'
-									? (inputData.payload as Record<string, unknown>)
-									: (inputData as Record<string, unknown>);
-
-							if (collectionFields?.fields?.field) {
-								for (const field of collectionFields.fields.field) {
-									if (field.name && field.value !== undefined) {
-										body[field.name] = processFieldValue(field.value);
-									}
-								}
-							}
-
-							responseData = await makeRequest({
-								method: 'POST',
-								url: `/items/${collection}`,
-								body,
-							});
-							break;
-						}
-
-						case 'createRaw': {
-							const jsonData = this.getNodeParameter('jsonData', i) as string;
-							let body;
-							try {
-								body = typeof jsonData === 'string' ? JSON.parse(jsonData) : jsonData;
-							} catch {
-								throw new NodeOperationError(this.getNode(), 'Invalid JSON format');
-							}
-							responseData = await makeRequest({
-								method: 'POST',
-								url: `/items/${collection}`,
-								body,
-							});
-							break;
-						}
-
-						case 'update': {
-							const itemId = this.getNodeParameter('itemId', i) as string;
-							const collectionFields = this.getNodeParameter('collectionFields', i) as {
-								fields?: { field?: Array<{ name: string; value: unknown }> };
-							};
-							const inputData = items[i].json;
-
-							const body: Record<string, unknown> =
-								inputData.payload && typeof inputData.payload === 'object'
-									? (inputData.payload as Record<string, unknown>)
-									: (inputData as Record<string, unknown>);
-
-							if (collectionFields?.fields?.field) {
-								for (const field of collectionFields.fields.field) {
-									if (field.name && field.value !== undefined) {
-										body[field.name] = processFieldValue(field.value);
-									}
-								}
-							}
-
-							responseData = await makeRequest({
-								method: 'PATCH',
-								url: `/items/${collection}/${itemId}`,
-								body,
-							});
-							break;
-						}
-
-						case 'updateRaw': {
-							const itemId = this.getNodeParameter('itemId', i) as string;
-							const jsonData = this.getNodeParameter('jsonData', i) as string;
-							let body;
-							try {
-								body = typeof jsonData === 'string' ? JSON.parse(jsonData) : jsonData;
-							} catch {
-								throw new NodeOperationError(this.getNode(), 'Invalid JSON format');
-							}
-							responseData = await makeRequest({
-								method: 'PATCH',
-								url: `/items/${collection}/${itemId}`,
-								body,
-							});
-							break;
-						}
-
-						case 'delete': {
-							const itemId = this.getNodeParameter('itemId', i) as string;
-							await makeRequest({
-								method: 'DELETE',
-								url: `/items/${collection}/${itemId}`,
-							});
-							responseData = { deleted: true, id: itemId };
-							break;
-						}
-
-						case 'get': {
-							const itemId = this.getNodeParameter('itemId', i) as string;
-							responseData = await makeRequest({
-								method: 'GET',
-								url: `/items/${collection}/${itemId}`,
-							});
-							break;
-						}
-
-						case 'getAll': {
-							const returnAll = this.getNodeParameter('returnAll', i) as boolean;
-							const limit = this.getNodeParameter('limit', i, 50) as number;
-							responseData = await makeRequest({
-								method: 'GET',
-								url: `/items/${collection}`,
-								qs: returnAll ? {} : { limit },
-							});
-							break;
-						}
-
-						default:
-							throw new NodeOperationError(this.getNode(), `Unknown operation: ${operation}`);
-					}
+					responseData = await executeItemOperations.call(
+						this,
+						operation,
+						collection,
+						i,
+						makeRequest,
+					);
 				} else if (resource === 'user') {
-					switch (operation) {
-						case 'invite': {
-							const email = this.getNodeParameter('email', i) as string;
-							const role = this.getNodeParameter('role', i) as string;
-							const invite_url = this.getNodeParameter('invite_url', i) as string;
-
-							if (!email) {
-								throw new NodeOperationError(
-									this.getNode(),
-									'Email is required for user invitation',
-								);
-							}
-
-							const body: Record<string, unknown> = { email };
-							if (role) body.role = role;
-							if (invite_url) body.invite_url = invite_url;
-
-							responseData = await makeRequest({
-								method: 'POST',
-								url: '/users/invite',
-								body,
-							});
-
-							responseData = {
-								success: true,
-								message: 'User invitation sent successfully',
-								email,
-								status: 'invited',
-								...(responseData as Record<string, unknown>),
-							};
-							break;
-						}
-
-						case 'update': {
-							const userId = this.getNodeParameter('userId', i) as string;
-							const userFields = this.getNodeParameter('userFields', i) as {
-								fields?: { field?: Array<{ name: string; value: unknown }> };
-							};
-							const inputData = items[i].json;
-
-							const body: Record<string, unknown> =
-								inputData.payload && typeof inputData.payload === 'object'
-									? (inputData.payload as Record<string, unknown>)
-									: (inputData as Record<string, unknown>);
-
-							if (userFields?.fields?.field) {
-								for (const field of userFields.fields.field) {
-									if (field.name && field.value !== undefined) {
-										body[field.name] = processFieldValue(field.value);
-									}
-								}
-							}
-
-							responseData = await makeRequest({
-								method: 'PATCH',
-								url: `/users/${userId}`,
-								body,
-							});
-							break;
-						}
-
-						case 'delete': {
-							const userId = this.getNodeParameter('userId', i) as string;
-							await makeRequest({
-								method: 'DELETE',
-								url: `/users/${userId}`,
-							});
-							responseData = { deleted: true, id: userId };
-							break;
-						}
-
-						case 'get': {
-							const userId = this.getNodeParameter('userId', i) as string;
-							responseData = await makeRequest({
-								method: 'GET',
-								url: `/users/${userId}`,
-							});
-							break;
-						}
-
-						case 'getAll': {
-							const returnAll = this.getNodeParameter('returnAll', i) as boolean;
-							const limit = this.getNodeParameter('limit', i, 50) as number;
-							responseData = await makeRequest({
-								method: 'GET',
-								url: '/users',
-								qs: returnAll ? {} : { limit },
-							});
-							break;
-						}
-
-						default:
-							throw new NodeOperationError(this.getNode(), `Unknown operation: ${operation}`);
-					}
+					responseData = await executeUserOperations.call(this, operation, i, makeRequest);
 				} else if (resource === 'file') {
-					switch (operation) {
-						case 'upload': {
-							const file = this.getNodeParameter('file', i) as string;
-							const title = this.getNodeParameter('title', i) as string;
-							const description = this.getNodeParameter('description', i) as string;
-							const folder = this.getNodeParameter('folder', i) as string;
-
-							if (!file) {
-								throw new NodeOperationError(this.getNode(), 'File is required for upload');
-							}
-
-							const body: Record<string, unknown> = { file };
-							if (title) body.title = title;
-							if (description) body.description = description;
-							if (folder) body.folder = folder;
-
-							responseData = await makeRequest({
-								method: 'POST',
-								url: '/files',
-								body,
-							});
-							break;
-						}
-
-						case 'update': {
-							const fileId = this.getNodeParameter('fileId', i) as string;
-							const fileFields = this.getNodeParameter('fileFields', i) as {
-								fields?: { field?: Array<{ name: string; value: unknown }> };
-							};
-							const inputData = items[i].json;
-
-							const body: Record<string, unknown> =
-								inputData.payload && typeof inputData.payload === 'object'
-									? (inputData.payload as Record<string, unknown>)
-									: (inputData as Record<string, unknown>);
-
-							if (fileFields?.fields?.field) {
-								for (const field of fileFields.fields.field) {
-									if (field.name && field.value !== undefined) {
-										body[field.name] = processFieldValue(field.value);
-									}
-								}
-							}
-
-							responseData = await makeRequest({
-								method: 'PATCH',
-								url: `/files/${fileId}`,
-								body,
-							});
-							break;
-						}
-
-						case 'delete': {
-							const fileId = this.getNodeParameter('fileId', i) as string;
-							await makeRequest({
-								method: 'DELETE',
-								url: `/files/${fileId}`,
-							});
-							responseData = { deleted: true, id: fileId };
-							break;
-						}
-
-						case 'get': {
-							const fileId = this.getNodeParameter('fileId', i) as string;
-							responseData = await makeRequest({
-								method: 'GET',
-								url: `/files/${fileId}`,
-							});
-							break;
-						}
-
-						case 'getAll': {
-							const returnAll = this.getNodeParameter('returnAll', i) as boolean;
-							const limit = this.getNodeParameter('limit', i, 50) as number;
-							responseData = await makeRequest({
-								method: 'GET',
-								url: '/files',
-								qs: returnAll ? {} : { limit },
-							});
-							break;
-						}
-
-						default:
-							throw new NodeOperationError(this.getNode(), `Unknown operation: ${operation}`);
-					}
+					responseData = await executeFileOperations.call(this, operation, i, makeRequest);
 				} else {
 					throw new NodeOperationError(this.getNode(), `Unknown resource: ${resource}`);
 				}
