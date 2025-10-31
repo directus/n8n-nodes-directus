@@ -18,9 +18,18 @@ export class DirectusApi implements ICredentialType {
 			type: 'string',
 			default: 'https://your-directus.app',
 			placeholder: 'https://your-directus.app',
-			description:
-				'Your Directus instance URL. Must start with http:// or https:// and do not include a trailing slash.',
+			description: 'Your Directus instance URL. Must start with http:// or https://',
 			required: true,
+		},
+		{
+			displayName:
+				'⚠️ Important: Token Permissions Impact Functionality - Your token needs a high level of permission to use this Node. Recommended to use a token with the "Admin" role.',
+			name: 'permissionNotice',
+			type: 'notice',
+			typeOptions: {
+				noticeType: 'warning',
+			},
+			default: '',
 		},
 		{
 			displayName: 'Access Token',
@@ -29,7 +38,9 @@ export class DirectusApi implements ICredentialType {
 			typeOptions: { password: true },
 			default: '',
 			description:
-				'Your Directus static access token. Go to the User Library > Pick a user and generate a static token for them.',
+				'<strong>Your Directus static access token.</strong> Go to the User Library > Pick a user and generate a static token for them.<br><br>' +
+				'<strong>⚠️ Permission Requirements:</strong> The token must have appropriate permissions.<br>' +
+				'Without sufficient permissions, you may encounter 403 Forbidden errors when using this integration.',
 			required: true,
 		},
 		{

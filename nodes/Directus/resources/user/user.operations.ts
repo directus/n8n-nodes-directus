@@ -25,10 +25,22 @@ export const userOperations: INodeProperties[] = [
 				action: 'Get a user',
 			},
 			{
+				name: 'Get (Raw JSON)',
+				value: 'getRaw',
+				description: 'Get a single user using raw JSON query parameters',
+				action: 'Get a user with raw JSON',
+			},
+			{
 				name: 'Get Many',
 				value: 'getAll',
 				description: 'Get many users',
 				action: 'Get many users',
+			},
+			{
+				name: 'Get Many (Raw JSON)',
+				value: 'getAllRaw',
+				description: 'Get many users using raw JSON query parameters',
+				action: 'Get many users with raw JSON',
 			},
 			{
 				name: 'Invite User',
@@ -41,6 +53,12 @@ export const userOperations: INodeProperties[] = [
 				value: 'update',
 				description: 'Update an existing user',
 				action: 'Update a user',
+			},
+			{
+				name: 'Update (Raw JSON)',
+				value: 'updateRaw',
+				description: 'Update an existing user using raw JSON data',
+				action: 'Update a user with raw JSON',
 			},
 		],
 		default: 'invite',

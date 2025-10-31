@@ -8,7 +8,7 @@ export const fileFields: INodeProperties[] = [
 		displayOptions: {
 			show: {
 				resource: ['file'],
-				operation: ['update', 'delete', 'get'],
+				operation: ['update', 'updateRaw', 'delete', 'get', 'getRaw'],
 			},
 		},
 		default: '',
@@ -118,5 +118,49 @@ export const fileFields: INodeProperties[] = [
 				],
 			},
 		],
+	},
+	{
+		displayName: 'JSON Data',
+		name: 'jsonData',
+		type: 'json',
+		default: '',
+		displayOptions: {
+			show: {
+				resource: ['file'],
+				operation: ['updateRaw'],
+			},
+		},
+		description: 'Raw JSON data to send to Directus',
+	},
+	{
+		displayName: 'Fields to Return',
+		name: 'fileFieldsToReturn',
+		type: 'multiOptions',
+		typeOptions: {
+			loadOptionsMethod: 'getFileFields',
+		},
+		displayOptions: {
+			show: {
+				resource: ['file'],
+				operation: ['get', 'getAll'],
+			},
+		},
+		default: [],
+		description:
+			'Select which fields to return in the response. Leave empty to return all fields. Choose from the list, or specify IDs using an <a href="https://docs.n8n.io/code/expressions/">expression</a>',
+	},
+	{
+		displayName: 'Query Parameters',
+		name: 'queryParameters',
+		type: 'json',
+		default: '{}',
+		displayOptions: {
+			show: {
+				resource: ['file'],
+				operation: ['getRaw', 'getAllRaw'],
+			},
+		},
+		description:
+			'Raw JSON query parameters for the GET request. Supports all Directus query parameters including fields, filter, sort, limit, etc. Example: {"fields": ["*"], "filter": {"type": {"_in": ["image/jpeg", "image/png"]}}, "limit": 10}',
 	},
 ];

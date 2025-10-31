@@ -37,10 +37,22 @@ export const itemOperations: INodeProperties[] = [
 				action: 'Get an item',
 			},
 			{
+				name: 'Get (Raw JSON)',
+				value: 'getRaw',
+				description: 'Get a single item using raw JSON query parameters',
+				action: 'Get an item with raw JSON',
+			},
+			{
 				name: 'Get Many',
 				value: 'getAll',
 				description: 'Get many items from a collection',
 				action: 'Get many items',
+			},
+			{
+				name: 'Get Many (Raw JSON)',
+				value: 'getAllRaw',
+				description: 'Get many items using raw JSON query parameters',
+				action: 'Get many items with raw JSON',
 			},
 			{
 				name: 'Update',

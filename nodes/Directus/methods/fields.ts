@@ -1,7 +1,6 @@
 import type { ILoadOptionsFunctions } from 'n8n-workflow';
-import { SYSTEM_COLLECTION_PREFIX, SYSTEM_FIELDS } from '../../../utils/constants';
 import { getCollectionsFromAPI, getFieldsFromAPI, getRelationsFromAPI } from './api';
-import { shouldSkipField, formatFieldName } from './utils';
+import { formatFieldName } from './utils';
 import type {
 	DirectusCredentials,
 	DirectusRelation,
@@ -71,11 +70,6 @@ function getFieldRelationshipInfo(
 	return { type: 'o2m', relatedCollection: relation.many_collection || '' };
 }
 
-function isSystemField(field: DirectusField): boolean {
-	if (!field?.field) return false;
-	return shouldSkipField(field) || SYSTEM_FIELDS.COMMON_SYSTEM_FIELDS.includes(field.field);
-}
-
 function createBaseN8nField(field: DirectusField, isCreate = false) {
 	const isRequired = isCreate && (field.meta?.required ?? false);
 	const displayName = field.meta?.display_name || formatFieldName(field.field);
@@ -95,8 +89,6 @@ function convertDirectusFieldToN8n(
 	isCreate = false,
 	relations: DirectusRelation[] = [],
 ) {
-	if (shouldSkipField(field)) return null;
-
 	const n8nField = createBaseN8nField(field, isCreate);
 	const fieldType = field.type.toLowerCase();
 	const interfaceType = field.meta?.interface?.toLowerCase() || '';
@@ -183,10 +175,11 @@ async function getFields(
 	try {
 		const fields = await getFieldsFromAPI(functions, collection);
 		fields.sort((a, b) => (a.meta?.sort ?? 0) - (b.meta?.sort ?? 0));
-		return fields.filter((f) => !isSystemField(f));
+		return fields;
 	} catch (error) {
+		const formattedError = error instanceof Error ? error : new Error(String(error));
 		throw new Error(
-			`Failed to fetch fields for collection '${collection}': ${formatDirectusError(error)}`,
+			`Failed to fetch fields for collection '${collection}': ${formattedError.message}`,
 		);
 	}
 }
@@ -198,11 +191,11 @@ export async function getCollections(
 		const collections = await getCollectionsFromAPI(functions);
 		return collections.filter((c) => {
 			if (!c?.collection) return false;
-			if (c.collection === 'directus_users' || c.collection === 'directus_files') return true;
-			return !c.collection.startsWith(SYSTEM_COLLECTION_PREFIX) || c.schema;
+			return !c.collection.startsWith('directus_');
 		});
 	} catch (error) {
-		throw new Error(`Failed to fetch collections: ${formatDirectusError(error)}`);
+		const formattedError = error instanceof Error ? error : new Error(String(error));
+		throw new Error(`Failed to fetch collections: ${formattedError.message}`);
 	}
 }
 
@@ -217,36 +210,5 @@ export async function convertCollectionFieldsToN8n(
 		? await getCollectionRelations(functions, collection)
 		: [];
 
-	return fields
-		.map((field) => convertDirectusFieldToN8n(field, isCreate, relations))
-		.filter((f): f is NonNullable<typeof f> => f !== null);
-}
-
-export function formatDirectusError(error: unknown): string {
-	if (error instanceof Error) {
-		return error.message;
-	}
-
-	if (typeof error === 'object' && error !== null) {
-		const e = error as {
-			response?: { data?: { errors?: Array<{ message?: string }>; message?: string } };
-			message?: string;
-			errors?: Array<{ message?: string }>;
-		};
-
-		if (e.response?.data?.errors?.length) {
-			return e.response.data.errors.map((x) => x.message || String(x)).join(', ');
-		}
-		if (e.response?.data?.message) {
-			return e.response.data.message;
-		}
-		if (e.message) {
-			return e.message;
-		}
-		if (e.errors?.length) {
-			return e.errors.map((x) => x.message || String(x)).join(', ');
-		}
-	}
-
-	return String(error) || 'An unknown error occurred';
+	return fields.map((field) => convertDirectusFieldToN8n(field, isCreate, relations));
 }

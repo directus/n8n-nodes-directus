@@ -25,16 +25,34 @@ export const fileOperations: INodeProperties[] = [
 				action: 'Get a file',
 			},
 			{
+				name: 'Get (Raw JSON)',
+				value: 'getRaw',
+				description: 'Get a single file using raw JSON query parameters',
+				action: 'Get a file with raw JSON',
+			},
+			{
 				name: 'Get Many',
 				value: 'getAll',
 				description: 'Get many files',
 				action: 'Get many files',
 			},
 			{
+				name: 'Get Many (Raw JSON)',
+				value: 'getAllRaw',
+				description: 'Get many files using raw JSON query parameters',
+				action: 'Get many files with raw JSON',
+			},
+			{
 				name: 'Update',
 				value: 'update',
 				description: 'Update file metadata',
 				action: 'Update a file',
+			},
+			{
+				name: 'Update (Raw JSON)',
+				value: 'updateRaw',
+				description: 'Update file metadata using raw JSON data',
+				action: 'Update a file with raw JSON',
 			},
 			{
 				name: 'Upload',

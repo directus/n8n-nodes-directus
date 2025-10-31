@@ -1,4 +1,4 @@
-import { IExecuteFunctions, NodeOperationError } from 'n8n-workflow';
+import { IExecuteFunctions, NodeOperationError, IDataObject } from 'n8n-workflow';
 import {
 	executeCreate,
 	executeUpdate,
@@ -8,17 +8,7 @@ import {
 	type MakeRequestFn,
 } from '../../methods/crud';
 import type { FieldParameter } from '../../types';
-
-function parseJsonData(context: IExecuteFunctions, jsonData: string | unknown): unknown {
-	if (typeof jsonData === 'string') {
-		try {
-			return JSON.parse(jsonData);
-		} catch {
-			throw new NodeOperationError(context.getNode(), 'Invalid JSON format');
-		}
-	}
-	return jsonData;
-}
+import { parseJsonData } from '../../methods/utils';
 
 export async function executeItemOperations(
 	this: IExecuteFunctions,
@@ -69,10 +59,40 @@ export async function executeItemOperations(
 			return executeDelete(this, itemIndex, makeRequest, resourcePath, 'itemId');
 
 		case 'get':
-			return executeGet(this, itemIndex, makeRequest, resourcePath, 'itemId');
+			return executeGet(this, itemIndex, makeRequest, resourcePath, 'itemId', 'itemFields', 'item');
+
+		case 'getRaw': {
+			const itemId = this.getNodeParameter('itemId', itemIndex) as string;
+			if (!itemId || itemId.trim() === '') {
+				throw new NodeOperationError(this.getNode(), 'Item ID is required for getRaw operation');
+			}
+			const queryParamsJson = this.getNodeParameter('queryParameters', itemIndex) as string;
+			let queryParams: IDataObject = {};
+			if (queryParamsJson) {
+				queryParams = parseJsonData(this, queryParamsJson) as IDataObject;
+			}
+			return await makeRequest({
+				method: 'GET',
+				url: `${resourcePath}/${itemId}`,
+				qs: queryParams,
+			});
+		}
 
 		case 'getAll':
-			return executeGetAll(this, itemIndex, makeRequest, resourcePath);
+			return executeGetAll(this, itemIndex, makeRequest, resourcePath, 'itemFields');
+
+		case 'getAllRaw': {
+			const queryParamsJson = this.getNodeParameter('queryParameters', itemIndex) as string;
+			let queryParams: IDataObject = {};
+			if (queryParamsJson) {
+				queryParams = parseJsonData(this, queryParamsJson) as IDataObject;
+			}
+			return await makeRequest({
+				method: 'GET',
+				url: resourcePath,
+				qs: queryParams,
+			});
+		}
 
 		default:
 			throw new NodeOperationError(this.getNode(), `Unknown operation: ${operation}`);

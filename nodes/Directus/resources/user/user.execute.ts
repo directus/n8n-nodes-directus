@@ -1,4 +1,4 @@
-import { IExecuteFunctions, NodeOperationError } from 'n8n-workflow';
+import { IExecuteFunctions, NodeOperationError, IDataObject } from 'n8n-workflow';
 import {
 	executeUpdate,
 	executeDelete,
@@ -7,6 +7,7 @@ import {
 	type MakeRequestFn,
 } from '../../methods/crud';
 import type { FieldParameter } from '../../types';
+import { parseJsonData } from '../../methods/utils';
 
 export async function executeUserOperations(
 	this: IExecuteFunctions,
@@ -52,14 +53,63 @@ export async function executeUserOperations(
 			return executeUpdate(this, itemIndex, makeRequest, resourcePath, 'userId', userFields);
 		}
 
+		case 'updateRaw': {
+			const userId = this.getNodeParameter('userId', itemIndex) as string;
+			const jsonData = this.getNodeParameter('jsonData', itemIndex);
+			const body = parseJsonData(this, jsonData) as Record<string, unknown>;
+			return await makeRequest({
+				method: 'PATCH',
+				url: `${resourcePath}/${userId}`,
+				body,
+			});
+		}
+
 		case 'delete':
 			return executeDelete(this, itemIndex, makeRequest, resourcePath, 'userId');
 
 		case 'get':
-			return executeGet(this, itemIndex, makeRequest, resourcePath, 'userId');
+			return executeGet(
+				this,
+				itemIndex,
+				makeRequest,
+				resourcePath,
+				'userId',
+				'userFieldsToReturn',
+				'user',
+			);
+
+		case 'getRaw': {
+			const userId = this.getNodeParameter('userId', itemIndex) as string;
+			if (!userId || userId.trim() === '') {
+				throw new NodeOperationError(this.getNode(), 'User ID is required for getRaw operation');
+			}
+			const queryParamsJson = this.getNodeParameter('queryParameters', itemIndex) as string;
+			let queryParams: IDataObject = {};
+			if (queryParamsJson) {
+				queryParams = parseJsonData(this, queryParamsJson) as IDataObject;
+			}
+			return await makeRequest({
+				method: 'GET',
+				url: `${resourcePath}/${userId}`,
+				qs: queryParams,
+			});
+		}
 
 		case 'getAll':
-			return executeGetAll(this, itemIndex, makeRequest, resourcePath);
+			return executeGetAll(this, itemIndex, makeRequest, resourcePath, 'userFieldsToReturn');
+
+		case 'getAllRaw': {
+			const queryParamsJson = this.getNodeParameter('queryParameters', itemIndex) as string;
+			let queryParams: IDataObject = {};
+			if (queryParamsJson) {
+				queryParams = parseJsonData(this, queryParamsJson) as IDataObject;
+			}
+			return await makeRequest({
+				method: 'GET',
+				url: resourcePath,
+				qs: queryParams,
+			});
+		}
 
 		default:
 			throw new NodeOperationError(this.getNode(), `Unknown operation: ${operation}`);

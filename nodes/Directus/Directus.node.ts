@@ -8,7 +8,7 @@ import {
 	IDataObject,
 } from 'n8n-workflow';
 
-import { formatDirectusError } from './methods/fields';
+import { formatDirectusError } from './methods/api';
 import { simplifyUser, simplifyFile } from './methods/simplify';
 import { createAuthenticatedRequest } from './methods/request';
 import type { DirectusCredentials, DirectusUser, DirectusFile } from './types';
@@ -72,6 +72,51 @@ export class Directus implements INodeType {
 					},
 				],
 				default: 'item',
+			},
+			{
+				displayName:
+					'Token Permission Required: Ensure your token has the correct permissions for this resource',
+				name: 'permissionWarningItem',
+				type: 'notice',
+				typeOptions: {
+					noticeType: 'warning',
+				},
+				displayOptions: {
+					show: {
+						resource: ['item'],
+					},
+				},
+				default: '',
+			},
+			{
+				displayName:
+					'Token Permission Required: Ensure your token has the correct permissions for this resource',
+				name: 'permissionWarningUser',
+				type: 'notice',
+				typeOptions: {
+					noticeType: 'warning',
+				},
+				displayOptions: {
+					show: {
+						resource: ['user'],
+					},
+				},
+				default: '',
+			},
+			{
+				displayName:
+					'Token Permission Required: Ensure your token has the correct permissions for this resource',
+				name: 'permissionWarningFile',
+				type: 'notice',
+				typeOptions: {
+					noticeType: 'warning',
+				},
+				displayOptions: {
+					show: {
+						resource: ['file'],
+					},
+				},
+				default: '',
 			},
 			...itemOperations,
 			...userOperations,
@@ -166,7 +211,8 @@ export class Directus implements INodeType {
 						pairedItem: { item: i },
 					});
 				} else {
-					throw new NodeOperationError(this.getNode(), formatDirectusError(error));
+					const formattedError = formatDirectusError(error);
+					throw new NodeOperationError(this.getNode(), formattedError.message);
 				}
 			}
 		}

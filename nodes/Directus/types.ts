@@ -140,3 +140,16 @@ export interface DirectusFile {
 	date_updated?: string;
 	[key: string]: unknown;
 }
+
+export interface DirectusHttpError {
+	statusCode?: number;
+	response?: {
+		statusCode?: number;
+		data?: {
+			errors?: Array<{ message?: string }>;
+			message?: string;
+		};
+	};
+	message?: string;
+	errors?: Array<{ message?: string }>;
+}
