@@ -1,103 +1,32 @@
 import type { ILoadOptionsFunctions } from 'n8n-workflow';
 import { SYSTEM_COLLECTION_PREFIX, SYSTEM_FIELDS } from '../../../utils/constants';
-import {
+import { getCollectionsFromAPI, getFieldsFromAPI, getRelationsFromAPI } from './api';
+import { shouldSkipField, formatFieldName } from './utils';
+import type {
 	DirectusCredentials,
-	getCollectionsFromAPI,
-	getFieldsFromAPI,
-	getRelationsFromAPI,
-} from './api';
-
-const LOWERCASE_WORDS = new Set([
-	'a',
-	'an',
-	'and',
-	'as',
-	'at',
-	'but',
-	'by',
-	'for',
-	'in',
-	'of',
-	'on',
-	'or',
-	'the',
-	'to',
-	'up',
-	'yet',
-]);
-
-type Relation = {
-	many_collection?: string;
-	one_collection?: string;
-	many_field?: string;
-	one_field?: string;
-};
-
-export interface Field {
-	field: string;
-	type: string;
-	collection?: string;
-	meta?: {
-		special?: string[];
-		sort?: number;
-		required?: boolean;
-		note?: string;
-		options?: {
-			choices?: Array<{ text: string; value: string }>;
-			[key: string]: unknown;
-		};
-		interface?: string;
-		locked?: boolean;
-		hidden?: boolean;
-		translations?: Array<{ translation: string; [key: string]: unknown }>;
-		display_name?: string;
-	};
-	schema?: {
-		foreign_key_table?: string;
-	};
-}
-
-export interface Collection {
-	collection: string;
-	schema?: unknown;
-	meta?: {
-		translations?: Array<{ translation: string; [key: string]: unknown }>;
-		display_template?: string;
-	};
-}
+	DirectusRelation,
+	DirectusField,
+	DirectusCollection,
+	FieldRelationship,
+} from '../types';
 
 export type { DirectusCredentials };
 
-const relationCache = new Map<string, Relation[]>();
+/** Cache for collection relations to avoid repeated API calls */
+const relationCache = new Map<string, DirectusRelation[]>();
 
-function formatTitle(input: string): string {
-	if (!input) return '';
-	const decamelized = input
-		.replace(/([a-z])([A-Z])/g, '$1 $2')
-		.replace(/([A-Z])([A-Z][a-z])/g, '$1 $2');
-	const words = decamelized.split(/\s|-|_/g);
-
-	return words
-		.map((word, index, array) => {
-			const lowercase = word.toLowerCase();
-			if (index === 0 || index === array.length - 1) {
-				return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
-			}
-			return LOWERCASE_WORDS.has(lowercase)
-				? lowercase
-				: word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
-		})
-		.join(' ');
-}
-
-function isRelationshipField(field: Field): boolean {
+function isRelationshipField(field: DirectusField): boolean {
 	return field?.meta?.special?.some((s) => ['m2o', 'o2m', 'm2m', 'm2a'].includes(s)) ?? false;
 }
 
+/**
+ * Gets relations for a specific collection, with caching
+ * @param collection - The collection name to get relations for
+ */
 async function getCollectionRelations(
 	functions: ILoadOptionsFunctions,
 	collection: string,
-): Promise<Relation[]> {
+): Promise<DirectusRelation[]> {
 	const credentials = (await functions.getCredentials('directusApi')) as DirectusCredentials;
 	const cacheKey = `${credentials.url}:${collection}`;
 
@@ -117,10 +46,14 @@ async function getCollectionRelations(
 	}
 }
 
+/**
+ * Extracts relationship information for a field
+ * Determines if a field is part of a M2O, O2M, or M2M relationship
+ */
 function getFieldRelationshipInfo(
-	field: Field,
-	relations: Relation[],
-): { type: string; relatedCollection: string } | null {
+	field: DirectusField,
+	relations: DirectusRelation[],
+): FieldRelationship | null {
 	if (!field?.field || !relations?.length) return null;
 
 	const relation = relations.find(
@@ -135,36 +68,17 @@ function getFieldRelationshipInfo(
 		return { type: 'm2o', relatedCollection: relation.one_collection || '' };
 	}
 
-	if (relation.one_field === field.field && relation.one_collection === field.collection) {
-		return { type: 'o2m', relatedCollection: relation.many_collection || '' };
-	}
-
-	return null;
+	return { type: 'o2m', relatedCollection: relation.many_collection || '' };
 }
 
-function shouldSkipField(field: Field): boolean {
-	if (!field?.meta) return true;
-	const special = field.meta.special || [];
-	return (
-		special.includes('m2a') ||
-		field.meta.locked ||
-		field.meta.hidden ||
-		field.type === 'alias' ||
-		field.field?.startsWith('$')
-	);
-}
-
-function isSystemField(field: Field): boolean {
+function isSystemField(field: DirectusField): boolean {
 	if (!field?.field) return false;
-	if (field.field === 'id') return true;
-	if (field.meta?.special?.includes('m2a') || field.type === 'alias' || field.field.startsWith('$'))
-		return true;
-	return SYSTEM_FIELDS.COMMON_SYSTEM_FIELDS.includes(field.field);
+	return shouldSkipField(field) || SYSTEM_FIELDS.COMMON_SYSTEM_FIELDS.includes(field.field);
 }
 
-function createBaseN8nField(field: Field, isCreate = false) {
+function createBaseN8nField(field: DirectusField, isCreate = false) {
 	const isRequired = isCreate && (field.meta?.required ?? false);
-	const displayName = formatTitle(field.field);
+	const displayName = field.meta?.display_name || formatFieldName(field.field);
 
 	return {
 		name: field.field,
@@ -176,43 +90,39 @@ function createBaseN8nField(field: Field, isCreate = false) {
 	};
 }
 
-function convertDirectusFieldToN8n(field: Field, isCreate = false, relations: Relation[] = []) {
+function convertDirectusFieldToN8n(
+	field: DirectusField,
+	isCreate = false,
+	relations: DirectusRelation[] = [],
+) {
 	if (shouldSkipField(field)) return null;
 
 	const n8nField = createBaseN8nField(field, isCreate);
 	const fieldType = field.type.toLowerCase();
 	const interfaceType = field.meta?.interface?.toLowerCase() || '';
 
-	if (field.meta?.options?.choices) {
+	// Choices/options field
+	if (
+		field.meta?.options &&
+		typeof field.meta.options === 'object' &&
+		'choices' in field.meta.options
+	) {
+		const choices = (field.meta.options.choices as Array<{ text: string; value: string }>) || [];
 		return {
 			...n8nField,
 			type: 'options' as const,
-			options: field.meta.options.choices.map((o) => ({ name: o.text, value: o.value })),
+			options: choices.map((o) => ({ name: o.text, value: o.value })),
 		};
 	}
 
-	if (isRelationshipField(field)) {
-		const relationship = getFieldRelationshipInfo(field, relations);
-		if (relationship) {
-			const { type, relatedCollection } = relationship;
-			if (relatedCollection === 'directus_files') {
-				return {
-					...n8nField,
-					type: 'string' as const,
-					description:
-						`${n8nField.description}\nUpload a file or select from existing files.`.trim(),
-				};
-			}
-			return {
-				...n8nField,
-				type: 'string' as const,
-				description:
-					`${n8nField.description}\n${type.toUpperCase()} relationship to ${formatTitle(relatedCollection)} collection.`.trim(),
-			};
-		}
-	}
+	// File fields (including relationship fields pointing to files)
+	const isFileField = ['file', 'file-image', 'file-video'].includes(interfaceType);
+	const relationship = isRelationshipField(field)
+		? getFieldRelationshipInfo(field, relations)
+		: null;
+	const isFileRelationship = relationship?.relatedCollection === 'directus_files';
 
-	if (['file', 'file-image', 'file-video'].includes(interfaceType)) {
+	if (isFileField || isFileRelationship) {
 		return {
 			...n8nField,
 			type: 'string' as const,
@@ -220,12 +130,28 @@ function convertDirectusFieldToN8n(field: Field, isCreate = false, relations: Re
 		};
 	}
 
-	if (
-		fieldType === 'boolean' ||
-		fieldType === 'toggle' ||
-		interfaceType === 'toggle' ||
-		interfaceType === 'boolean'
-	) {
+	// Other relationship fields
+	if (relationship) {
+		const { type, relatedCollection } = relationship;
+		return {
+			...n8nField,
+			type: 'string' as const,
+			description:
+				`${n8nField.description}\n${type.toUpperCase()} relationship to ${formatFieldName(relatedCollection)} collection.`.trim(),
+		};
+	}
+
+	// JSON fields
+	if (fieldType === 'json' || interfaceType === 'json') {
+		return {
+			...n8nField,
+			type: 'string' as const,
+			description: `${n8nField.description}\nEnter JSON data.`.trim(),
+		};
+	}
+
+	// Type mapping for common field types
+	if (['boolean', 'toggle'].includes(fieldType) || ['toggle', 'boolean'].includes(interfaceType)) {
 		return { ...n8nField, type: 'boolean' as const };
 	}
 
@@ -247,20 +173,15 @@ function convertDirectusFieldToN8n(field: Field, isCreate = false, relations: Re
 		return { ...n8nField, type: 'string' as const };
 	}
 
-	if (fieldType === 'json' || interfaceType === 'json') {
-		return {
-			...n8nField,
-			type: 'string' as const,
-			description: `${n8nField.description}\nEnter JSON data.`.trim(),
-		};
-	}
-
 	return n8nField;
 }
 
-async function getFields(functions: ILoadOptionsFunctions, collection: string): Promise<Field[]> {
+async function getFields(
+	functions: ILoadOptionsFunctions,
+	collection: string,
+): Promise<DirectusField[]> {
 	try {
-		const fields: Field[] = await getFieldsFromAPI(functions, collection);
+		const fields = await getFieldsFromAPI(functions, collection);
 		fields.sort((a, b) => (a.meta?.sort ?? 0) - (b.meta?.sort ?? 0));
 		return fields.filter((f) => !isSystemField(f));
 	} catch (error) {
@@ -270,10 +191,12 @@ async function getFields(functions: ILoadOptionsFunctions, collection: string): 
 	}
 }
 
-export async function getCollections(functions: ILoadOptionsFunctions): Promise<Collection[]> {
+export async function getCollections(
+	functions: ILoadOptionsFunctions,
+): Promise<DirectusCollection[]> {
 	try {
 		const collections = await getCollectionsFromAPI(functions);
-		return collections.filter((c: Collection) => {
+		return collections.filter((c) => {
 			if (!c?.collection) return false;
 			if (c.collection === 'directus_users' || c.collection === 'directus_files') return true;
 			return !c.collection.startsWith(SYSTEM_COLLECTION_PREFIX) || c.schema;
@@ -299,38 +222,31 @@ export async function convertCollectionFieldsToN8n(
 		.filter((f): f is NonNullable<typeof f> => f !== null);
 }
 
-export function processFieldValue(value: unknown): unknown {
-	if (value === undefined || value === null) return value;
-	if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean')
-		return value;
-	if (typeof value === 'object') return value;
-	return String(value);
-}
-
 export function formatDirectusError(error: unknown): string {
-	const e = error as {
-		response?: { data?: { errors?: Array<{ message?: string }>; message?: string } };
-		message?: string;
-		errors?: Array<{ message?: string }>;
-	};
-
-	if (e.response?.data?.errors?.length) {
-		return e.response.data.errors.map((x) => x.message || x).join(', ');
+	if (error instanceof Error) {
+		return error.message;
 	}
-	if (e.response?.data?.message) return e.response.data.message;
-	if (e.message) return e.message;
-	if (e.errors?.length) return e.errors.map((x) => x.message).join(', ');
-	return 'An unknown error occurred';
-}
 
-export function formatDisplayName(field: {
-	field: string;
-	meta?: { display_name?: string };
-}): string {
-	return (
-		field.meta?.display_name ||
-		field.field.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())
-	);
-}
+	if (typeof error === 'object' && error !== null) {
+		const e = error as {
+			response?: { data?: { errors?: Array<{ message?: string }>; message?: string } };
+			message?: string;
+			errors?: Array<{ message?: string }>;
+		};
 
-export const shouldSkipFieldPublic = shouldSkipField;
+		if (e.response?.data?.errors?.length) {
+			return e.response.data.errors.map((x) => x.message || String(x)).join(', ');
+		}
+		if (e.response?.data?.message) {
+			return e.response.data.message;
+		}
+		if (e.message) {
+			return e.message;
+		}
+		if (e.errors?.length) {
+			return e.errors.map((x) => x.message || String(x)).join(', ');
+		}
+	}
+
+	return String(error) || 'An unknown error occurred';
+}

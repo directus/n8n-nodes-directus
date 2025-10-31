@@ -1,39 +1,38 @@
-import { IExecuteFunctions, NodeOperationError, IHttpRequestOptions } from 'n8n-workflow';
-import { processFieldValue } from '../../methods/fields';
+import { IExecuteFunctions, NodeOperationError } from 'n8n-workflow';
+import {
+	executeUpdate,
+	executeDelete,
+	executeGet,
+	executeGetAll,
+	type MakeRequestFn,
+} from '../../methods/crud';
+import type { FieldParameter } from '../../types';
 
 export async function executeUserOperations(
 	this: IExecuteFunctions,
 	operation: string,
 	itemIndex: number,
-	makeRequest: (options: IHttpRequestOptions) => Promise<unknown>,
+	makeRequest: MakeRequestFn,
 ): Promise<unknown> {
-	type OperationHandler = (
-		self: IExecuteFunctions,
-		i: number,
-		makeRequest: (options: IHttpRequestOptions) => Promise<unknown>,
-	) => Promise<unknown>;
+	const resourcePath = '/users';
 
-	const operationMap: Record<string, OperationHandler> = {
-		invite: async (
-			self: IExecuteFunctions,
-			i: number,
-			reqFn: (options: IHttpRequestOptions) => Promise<unknown>,
-		) => {
-			const email = self.getNodeParameter('email', i) as string;
-			const role = self.getNodeParameter('role', i) as string;
-			const invite_url = self.getNodeParameter('invite_url', i) as string;
+	switch (operation) {
+		case 'invite': {
+			const email = this.getNodeParameter('email', itemIndex) as string;
+			const role = this.getNodeParameter('role', itemIndex) as string;
+			const invite_url = this.getNodeParameter('invite_url', itemIndex) as string;
 
 			if (!email) {
-				throw new NodeOperationError(self.getNode(), 'Email is required for user invitation');
+				throw new NodeOperationError(this.getNode(), 'Email is required for user invitation');
 			}
 
 			const body: Record<string, unknown> = { email };
 			if (role) body.role = role;
 			if (invite_url) body.invite_url = invite_url;
 
-			const responseData = await reqFn({
+			const responseData = await makeRequest({
 				method: 'POST',
-				url: '/users/invite',
+				url: `${resourcePath}/invite`,
 				body,
 			});
 
@@ -44,79 +43,25 @@ export async function executeUserOperations(
 				status: 'invited',
 				...(responseData as Record<string, unknown>),
 			};
-		},
+		}
 
-		update: async (
-			self: IExecuteFunctions,
-			i: number,
-			reqFn: (options: IHttpRequestOptions) => Promise<unknown>,
-		) => {
-			const userId = self.getNodeParameter('userId', i) as string;
-			const userFields = self.getNodeParameter('userFields', i) as {
-				fields?: { field?: Array<{ name: string; value: unknown }> };
-			};
+		case 'update': {
+			const userFields = this.getNodeParameter('userFields', itemIndex) as
+				| FieldParameter
+				| undefined;
+			return executeUpdate(this, itemIndex, makeRequest, resourcePath, 'userId', userFields);
+		}
 
-			const body: Record<string, unknown> = {};
+		case 'delete':
+			return executeDelete(this, itemIndex, makeRequest, resourcePath, 'userId');
 
-			if (userFields?.fields?.field) {
-				for (const field of userFields.fields.field) {
-					if (field.name && field.value !== undefined) {
-						body[field.name] = processFieldValue(field.value);
-					}
-				}
-			}
+		case 'get':
+			return executeGet(this, itemIndex, makeRequest, resourcePath, 'userId');
 
-			return await reqFn({
-				method: 'PATCH',
-				url: `/users/${userId}`,
-				body,
-			});
-		},
+		case 'getAll':
+			return executeGetAll(this, itemIndex, makeRequest, resourcePath);
 
-		delete: async (
-			self: IExecuteFunctions,
-			i: number,
-			reqFn: (options: IHttpRequestOptions) => Promise<unknown>,
-		) => {
-			const userId = self.getNodeParameter('userId', i) as string;
-			await reqFn({
-				method: 'DELETE',
-				url: `/users/${userId}`,
-			});
-			return { deleted: true, id: userId };
-		},
-
-		get: async (
-			self: IExecuteFunctions,
-			i: number,
-			reqFn: (options: IHttpRequestOptions) => Promise<unknown>,
-		) => {
-			const userId = self.getNodeParameter('userId', i) as string;
-			return await reqFn({
-				method: 'GET',
-				url: `/users/${userId}`,
-			});
-		},
-
-		getAll: async (
-			self: IExecuteFunctions,
-			i: number,
-			reqFn: (options: IHttpRequestOptions) => Promise<unknown>,
-		) => {
-			const returnAll = self.getNodeParameter('returnAll', i) as boolean;
-			const limit = self.getNodeParameter('limit', i, 50) as number;
-			return await reqFn({
-				method: 'GET',
-				url: '/users',
-				qs: returnAll ? {} : { limit },
-			});
-		},
-	};
-
-	const handler = operationMap[operation];
-	if (!handler) {
-		throw new NodeOperationError(this.getNode(), `Unknown operation: ${operation}`);
+		default:
+			throw new NodeOperationError(this.getNode(), `Unknown operation: ${operation}`);
 	}
-
-	return await handler(this, itemIndex, makeRequest);
 }

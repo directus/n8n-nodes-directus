@@ -9,6 +9,9 @@ import {
 } from 'n8n-workflow';
 
 import { formatDirectusError } from './methods/fields';
+import { simplifyUser, simplifyFile } from './methods/simplify';
+import { createAuthenticatedRequest } from './methods/request';
+import type { DirectusCredentials, DirectusUser, DirectusFile } from './types';
 import { itemOperations } from './resources/item/item.operations';
 import { userOperations } from './resources/user/user.operations';
 import { fileOperations } from './resources/file/file.operations';
@@ -93,28 +96,16 @@ export class Directus implements INodeType {
 	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
 		const items = this.getInputData();
 		const returnData: INodeExecutionData[] = [];
-		const credentials = (await this.getCredentials('directusApi')) as {
-			url: string;
-			token: string;
-		};
+		const credentials = (await this.getCredentials('directusApi')) as DirectusCredentials;
 
 		for (let i = 0; i < items.length; i++) {
 			try {
 				const resource = this.getNodeParameter('resource', i) as string;
 				const operation = this.getNodeParameter('operation', i) as string;
 
-				// Helper function to make authenticated requests
+				const getRequestOptions = createAuthenticatedRequest(credentials);
 				const makeRequest = async (options: IHttpRequestOptions) => {
-					return await this.helpers.httpRequest({
-						...options,
-						baseURL: credentials.url,
-						headers: {
-							Authorization: `Bearer ${credentials.token}`,
-							'Content-Type': 'application/json',
-							Accept: 'application/json',
-							...options.headers,
-						},
-					});
+					return await this.helpers.httpRequest(getRequestOptions(options));
 				};
 
 				let responseData: unknown;
@@ -137,7 +128,7 @@ export class Directus implements INodeType {
 					throw new NodeOperationError(this.getNode(), `Unknown resource: ${resource}`);
 				}
 
-				let parsedResponse = responseData;
+				let parsedResponse: unknown = responseData;
 				if (typeof responseData === 'string') {
 					try {
 						parsedResponse = JSON.parse(responseData);
@@ -153,32 +144,10 @@ export class Directus implements INodeType {
 				if (resource === 'user' || resource === 'file') {
 					const simplify = this.getNodeParameter('simplify', i, false) as boolean;
 					if (simplify && Array.isArray(itemData)) {
-						processedData = itemData.map((item: Record<string, unknown>) => {
-							if (resource === 'user') {
-								// Return only essential fields for simplified user output
-								const result: Record<string, unknown> = { id: item.id };
-								if (item.email) result.email = item.email;
-								if (item.first_name) result.first_name = item.first_name;
-								if (item.last_name) result.last_name = item.last_name;
-								if (item.status) result.status = item.status;
-								if (item.role) result.role = item.role;
-								if (item.date_created) result.date_created = item.date_created;
-								if (item.last_access) result.last_access = item.last_access;
-								return result;
-							} else if (resource === 'file') {
-								// Return only essential fields for simplified file output
-								const result: Record<string, unknown> = { id: item.id };
-								if (item.filename_download) result.filename_download = item.filename_download;
-								if (item.title) result.title = item.title;
-								if (item.type) result.type = item.type;
-								if (item.filesize) result.filesize = item.filesize;
-								if (item.width) result.width = item.width;
-								if (item.height) result.height = item.height;
-								if (item.date_created) result.date_created = item.date_created;
-								if (item.date_updated) result.date_updated = item.date_updated;
-								return result;
-							}
-							return item;
+						processedData = itemData.map((item) => {
+							return resource === 'user'
+								? simplifyUser(item as DirectusUser)
+								: simplifyFile(item as DirectusFile);
 						});
 					}
 				}

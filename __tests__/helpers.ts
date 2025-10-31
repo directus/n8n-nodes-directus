@@ -29,7 +29,9 @@ export function createMockExecuteFunctions(
 		getCurrentNodeParameter: vi.fn((parameter: string) => {
 			return options.nodeParameters[parameter];
 		}),
-		getCredentials: vi.fn<any>().mockResolvedValue(options.credentials || mockDirectusCredentials()),
+		getCredentials: vi
+			.fn<any>()
+			.mockResolvedValue(options.credentials || mockDirectusCredentials()),
 		getInputData: vi.fn(() => {
 			return options.inputData || [{ json: {} }];
 		}),
@@ -75,6 +77,10 @@ export function createMockWebhookFunctions(
 		getNodeWebhookUrl: vi.fn(() => {
 			return 'https://webhook.url';
 		}),
+		getWorkflow: vi.fn(() => ({
+			id: 'test-workflow-id',
+			name: 'Test Workflow',
+		})),
 		helpers: {
 			request: vi.fn<any>().mockResolvedValue({ data: { data: [] } }),
 			httpRequest: vi.fn<any>().mockResolvedValue({

@@ -4,14 +4,22 @@ import {
 	INodeType,
 	INodeTypeDescription,
 	IWebhookResponseData,
-	JsonObject,
 	ILoadOptionsFunctions,
-	NodeApiError,
 	NodeOperationError,
 	INodeExecutionData,
 } from 'n8n-workflow';
 
 import { getCollections } from '../Directus/methods/fields';
+import type { DirectusCredentials } from '../Directus/types';
+
+interface DirectusWebhookPayload {
+	event: string;
+	payload: Record<string, unknown>;
+	collection?: string;
+	key?: string;
+	id?: string;
+	keys?: string[];
+}
 
 export class DirectusTrigger implements INodeType {
 	description: INodeTypeDescription = {
@@ -131,124 +139,83 @@ export class DirectusTrigger implements INodeType {
 
 	webhookMethods = {
 		default: {
+			/**
+			 * Check if the Directus flow we created still exists
+			 * Called when n8n workflow is activated to verify webhook is still valid
+			 */
 			async checkExists(this: IHookFunctions): Promise<boolean> {
 				const webhookData = this.getWorkflowStaticData('node');
+				if (!webhookData.flowId) return false;
 
-				if (webhookData.flowId === undefined) {
-					// No flow id is set so no flow can exist
-					return false;
-				}
+				const credentials = (await this.getCredentials('directusApi')) as DirectusCredentials;
+				const directusBaseUrl = credentials.url.replace(/\/+$/, '');
+				const flowCheckUrl = `${directusBaseUrl}/flows/${webhookData.flowId}`;
 
-				// Flow got created before so check if it still exists
-				const credentials = (await this.getCredentials('directusApi')) as {
-					url: string;
-					token: string;
-				};
-
-				// Normalize the URL to avoid double slashes
-				const baseUrl = credentials.url.replace(/\/+$/, '');
-
-				const urlVariants = [
-					`${baseUrl}/flows/${webhookData.flowId}`,
-					`${baseUrl}/api/flows/${webhookData.flowId}`,
-				];
-
-				for (const apiUrl of urlVariants) {
-					try {
-						await this.helpers.httpRequest({
-							method: 'GET',
-							url: apiUrl,
-							headers: {
-								Authorization: `Bearer ${credentials.token}`,
-							},
-						});
-
-						// If we get here, the flow exists
-						return true;
-					} catch (error: unknown) {
-						if ((error as { cause?: { httpCode?: string } })?.cause?.httpCode === '404') {
-							// Flow does not exist
-							delete webhookData.flowId;
-							return false;
-						}
-
-						// Some other error occurred, try next URL variant
-						continue;
+				try {
+					await this.helpers.httpRequest({
+						method: 'GET',
+						url: flowCheckUrl,
+						headers: { Authorization: `Bearer ${credentials.token}` },
+					});
+					return true;
+				} catch (error: unknown) {
+					const httpCode = (error as { cause?: { httpCode?: string } })?.cause?.httpCode;
+					if (httpCode === '404') {
+						delete webhookData.flowId;
+						return false;
 					}
 				}
 
-				// All URL variants failed, assume flow doesn't exist
 				delete webhookData.flowId;
 				return false;
 			},
 
+			/**
+			 * Create Directus flows that will send events to n8n
+			 *
+			 * TEST MODE EXPLANATION:
+			 * When testing a workflow in n8n, n8n provides a test webhook URL (contains 'webhook-test').
+			 * When activating a workflow, n8n provides a production webhook URL (contains 'webhook').
+			 *
+			 * We need TWO flows in Directus:
+			 * 1. Test flow: "n8n - create posts (test)" → sends to test webhook URL
+			 *    - Used when you click "Listen for Test Event" in n8n
+			 *    - Automatically cleaned up when test ends
+			 *
+			 * 2. Production flow: "n8n - create posts" → sends to production webhook URL
+			 *    - Used when workflow is activated
+			 *    - Persists until workflow is deactivated
+			 *
+			 * WHY BOTH?
+			 * - During testing, we create BOTH so production flow is ready when you activate
+			 * - On activation, we only update production flow (test flow was already created)
+			 * - This prevents needing to recreate flows every time you test then activate
+			 */
 			async create(this: IHookFunctions): Promise<boolean> {
-				const originalWebhookUrl = this.getNodeWebhookUrl('default') as string;
-				const isTestExecution = originalWebhookUrl.includes('webhook-test');
+				const n8nWebhookUrl = this.getNodeWebhookUrl('default') as string;
+				const isTestMode = n8nWebhookUrl.includes('webhook-test');
 
-				// Always create/update the production flow for persistent operation
-				const productionWebhookUrl = originalWebhookUrl.replace('webhook-test', 'webhook');
-
-				// Use the appropriate URL for this execution
-				const webhookUrl = isTestExecution ? originalWebhookUrl : productionWebhookUrl;
-
-				if (
-					webhookUrl.includes('//localhost') &&
-					!webhookUrl.includes('ngrok') &&
-					!webhookUrl.includes('tunnel')
-				) {
-					// For local development, we'll allow localhost but warn the user
-					// Note: Using localhost webhook URL. This will only work if Directus can reach this URL.
-					// Uncomment the line below to enforce the restriction in production
-					// throw new NodeOperationError(this.getNode(), 'The Webhook can not work on "localhost". Please use a public URL or start n8n with "--tunnel"!');
-				}
-
-				const credentials = (await this.getCredentials('directusApi')) as {
-					url: string;
-					token: string;
-				};
+				const credentials = (await this.getCredentials('directusApi')) as DirectusCredentials;
 				const resource = this.getNodeParameter('resource', 0) as string;
 				const event = this.getNodeParameter('event', 0) as string;
 				const collection = this.getNodeParameter('collection', 0) as string;
 
-				// Normalize the URL to avoid double slashes
-				const baseUrl = credentials.url.replace(/\/+$/, '');
+				const resourceName = collection || resource;
+				const directusBaseUrl = credentials.url.replace(/\/+$/, '');
+				const directusFlowsApiUrl = `${directusBaseUrl}/flows`;
 
-				// Handle different URL formats for Directus API compatibility
-				const urlVariants = [`${baseUrl}/flows`, `${baseUrl}/api/flows`];
-
-				// Define flow names for both test and production
-				const resourceName = collection || resource; // Use collection for items, resource name for users/files
+				// Flow names: one for testing, one for production
 				const testFlowName = `n8n - ${event} ${resourceName} (test)`;
-				const productionFlowName = `n8n - ${event} ${resourceName}`;
+				const prodFlowName = `n8n - ${event} ${resourceName}`;
 
-				// Create flows for both test and production scenarios
-				const flowsToCreate = [];
+				// Webhook URLs: test uses webhook-test, production uses webhook
+				const testWebhookUrl = n8nWebhookUrl.includes('webhook-test')
+					? n8nWebhookUrl
+					: n8nWebhookUrl.replace('webhook', 'webhook-test');
+				const prodWebhookUrl = n8nWebhookUrl.replace('webhook-test', 'webhook');
 
-				if (isTestExecution) {
-					// For test execution, create both test and production flows
-					flowsToCreate.push(
-						{
-							name: testFlowName,
-							url: originalWebhookUrl,
-							isTest: true,
-						},
-						{
-							name: productionFlowName,
-							url: productionWebhookUrl,
-							isTest: false,
-						},
-					);
-				} else {
-					// For production activation, only create/update production flow
-					flowsToCreate.push({
-						name: productionFlowName,
-						url: productionWebhookUrl,
-						isTest: false,
-					});
-				}
-
-				const baseFlowConfig = {
+				// Directus flow configuration
+				const flowConfig = {
 					icon: 'bolt',
 					status: 'active',
 					trigger: 'event',
@@ -260,243 +227,165 @@ export class DirectusTrigger implements INodeType {
 					},
 				};
 
-				const webhookData = this.getWorkflowStaticData('node');
-
-				// Clean up any existing flows with similar names to prevent duplicates
+				// Check if flows already exist (to avoid duplicates)
+				let existingFlows: Array<{ id: string; name?: string }> = [];
 				try {
-					// Get all existing flows
-					for (const apiUrl of urlVariants) {
-						try {
-							const response = await this.helpers.httpRequest({
-								method: 'GET',
-								url: apiUrl,
-								baseURL: credentials.url,
-								headers: {
-									Authorization: `Bearer ${credentials.token}`,
-									Accept: 'application/json',
-								},
-							});
+					const response = await this.helpers.httpRequest({
+						method: 'GET',
+						url: directusFlowsApiUrl,
+						headers: {
+							Authorization: `Bearer ${credentials.token}`,
+							Accept: 'application/json',
+						},
+					});
 
-							const flows = response.data.data || [];
-
-							// Find flows to clean up
-							const flowsToDelete = flows.filter((flow: { name?: string; id: string }) => {
-								const flowName = flow.name || '';
-								// Clean up old test flows and matching production flows if we're recreating
-								if (isTestExecution) {
-									// For test execution, only clean up old test flows
-									return flowName === testFlowName;
-								} else {
-									// For production, clean up both test and production flows
-									return flowName === testFlowName || flowName === productionFlowName;
-								}
-							});
-
-							// Delete matching flows
-							for (const flow of flowsToDelete) {
-								try {
-									await this.helpers.httpRequest({
-										method: 'DELETE',
-										url: `${apiUrl}/${flow.id}`,
-										baseURL: credentials.url,
-										headers: {
-											Authorization: `Bearer ${credentials.token}`,
-										},
-									});
-								} catch {
-									// Ignore cleanup errors
-								}
-							}
-
-							break; // Success, exit the loop
-						} catch {
-							// Try next URL variant
-							continue;
+					if (Array.isArray(response)) {
+						existingFlows = response;
+					} else if ((response as { data?: unknown })?.data) {
+						const data = (response as { data: unknown }).data;
+						if (Array.isArray(data)) {
+							existingFlows = data;
 						}
 					}
 				} catch {
-					// Ignore cleanup errors
+					// Continue with empty array if fetch fails
 				}
 
-				// Create all flows and track them
-				const createdFlows = [];
-				let mainFlowId = null;
+				// Find flows by exact name match
+				const existingTestFlow = existingFlows.find((flow) => flow.name === testFlowName);
+				const existingProdFlow = existingFlows.find((flow) => flow.name === prodFlowName);
 
-				for (const flowConfig of flowsToCreate) {
-					const body = {
-						...baseFlowConfig,
-						name: flowConfig.name,
-					};
+				/**
+				 * Create or reuse a Directus flow and configure it to send events to n8n webhook
+				 */
+				const setupFlow = async (
+					flowName: string,
+					webhookUrl: string,
+					existingFlow?: { id: string },
+				): Promise<string> => {
+					let flowId: string;
 
-					let responseData;
-					let lastError: Error | undefined;
-
-					// Try to create the flow
-					for (const apiUrl of urlVariants) {
-						try {
-							responseData = await this.helpers.httpRequest({
-								method: 'POST',
-								url: apiUrl,
-								headers: {
-									Authorization: `Bearer ${credentials.token}`,
-									'Content-Type': 'application/json',
-								},
-								body,
-							});
-
-							break; // Success
-						} catch (error) {
-							lastError = error;
-							continue;
-						}
-					}
-
-					if (!responseData) {
-						throw new NodeOperationError(
-							this.getNode(),
-							`Failed to create Directus flow ${flowConfig.name}: ${(lastError as Error)?.message || 'All URL variants failed'}`,
-							{ level: 'warning' },
-						);
-					}
-
-					// Parse the response if it's a string
-					let parsedResponse: { data?: { id: string } };
-
-					if (typeof responseData === 'string') {
-						try {
-							parsedResponse = JSON.parse(responseData);
-						} catch (parseError: unknown) {
-							throw new NodeOperationError(
-								this.getNode(),
-								`Failed to parse flow response for ${flowConfig.name}: ${parseError}`,
-								{
-									level: 'warning',
-								},
-							);
-						}
+					// Reuse existing flow or create new one
+					if (existingFlow) {
+						flowId = existingFlow.id;
 					} else {
-						parsedResponse = responseData;
-					}
-
-					if (!parsedResponse?.data?.id) {
-						throw new NodeApiError(this.getNode(), parsedResponse as JsonObject, {
-							message: `Directus flow creation response for ${flowConfig.name} did not contain the expected data.`,
-						});
-					}
-
-					const flow = parsedResponse.data as { id: string };
-					createdFlows.push({ ...flow, webhookUrl: flowConfig.url, isTest: flowConfig.isTest });
-
-					// Track the main flow ID (production flow for persistence, or test flow if only testing)
-					if (!flowConfig.isTest || flowsToCreate.length === 1) {
-						mainFlowId = flow.id;
-					}
-				}
-
-				// Create operations for all flows
-				for (const flow of createdFlows) {
-					const operationUrl = urlVariants[0].replace('/flows', `/flows/${flow.id}`);
-
-					try {
-						await this.helpers.httpRequest({
-							method: 'PATCH',
-							url: operationUrl,
+						const response = await this.helpers.httpRequest({
+							method: 'POST',
+							url: directusFlowsApiUrl,
 							headers: {
 								Authorization: `Bearer ${credentials.token}`,
 								'Content-Type': 'application/json',
 							},
 							body: {
-								flow: flow.id,
+								...flowConfig,
+								name: flowName,
+							},
+						});
+
+						const parsedResponse = typeof response === 'string' ? JSON.parse(response) : response;
+
+						if (parsedResponse?.data?.id) {
+							flowId = parsedResponse.data.id;
+						} else {
+							throw new NodeOperationError(this.getNode(), `Failed to create flow: ${flowName}`);
+						}
+					}
+
+					// Configure the flow to send events to n8n webhook
+					const flowOperationUrl = `${directusFlowsApiUrl}/${flowId}`;
+					try {
+						await this.helpers.httpRequest({
+							method: 'PATCH',
+							url: flowOperationUrl,
+							headers: {
+								Authorization: `Bearer ${credentials.token}`,
+								'Content-Type': 'application/json',
+							},
+							body: {
+								flow: flowId,
 								operation: {
 									name: 'Send to n8n',
 									key: 'send_to_n8n',
 									type: 'request',
 									position_x: 19,
 									position_y: 1,
-									flow: flow.id,
+									flow: flowId,
 									options: {
 										method: 'POST',
-										url: flow.webhookUrl,
-										headers: [
-											{
-												header: 'Content-Type',
-												value: 'application/json',
-											},
-										],
+										url: webhookUrl,
+										headers: [{ header: 'Content-Type', value: 'application/json' }],
 										body: '{{$trigger}}',
 									},
 								},
 							},
 						});
 					} catch (error) {
-						// If operation creation fails, clean up the flow
-						try {
-							await this.helpers.httpRequest({
+						// Cleanup: delete flow if configuration failed
+						await this.helpers
+							.httpRequest({
 								method: 'DELETE',
-								url: operationUrl,
-								headers: {
-									Authorization: `Bearer ${credentials.token}`,
-								},
-							});
-						} catch {
-							// Ignore cleanup errors
-						}
+								url: flowOperationUrl,
+								headers: { Authorization: `Bearer ${credentials.token}` },
+							})
+							.catch(() => {});
 
 						throw new NodeOperationError(
 							this.getNode(),
-							`Failed to create webhook operation for flow ${flow.id}: ${(error as Error).message}`,
-							{ level: 'warning' },
+							`Failed to configure ${flowName}: ${(error as Error).message}`,
 						);
 					}
+
+					return flowId;
+				};
+
+				try {
+					if (isTestMode) {
+						// Test mode: create/update BOTH flows
+						// Test flow for current test, production flow ready for activation
+						const testFlowId = await setupFlow(testFlowName, testWebhookUrl, existingTestFlow);
+						await setupFlow(prodFlowName, prodWebhookUrl, existingProdFlow);
+
+						const webhookData = this.getWorkflowStaticData('node');
+						webhookData.flowId = testFlowId; // Store test flow ID for cleanup
+					} else {
+						// Production mode: only create/update production flow
+						const prodFlowId = await setupFlow(prodFlowName, prodWebhookUrl, existingProdFlow);
+
+						const webhookData = this.getWorkflowStaticData('node');
+						webhookData.flowId = prodFlowId; // Store prod flow ID for cleanup
+					}
+				} catch (error) {
+					throw new NodeOperationError(
+						this.getNode(),
+						`Failed to create/configure flows: ${(error as Error).message}`,
+					);
 				}
 
-				// Store the main flow ID for persistence tracking
-				webhookData.flowId = mainFlowId as string;
-
-				// Store test flow IDs for cleanup if this was a test execution
-				if (isTestExecution) {
-					const testFlows = createdFlows.filter((f) => f.isTest);
-					webhookData.testFlowIds = testFlows.map((f) => f.id);
-				}
 				return true;
 			},
 
+			/**
+			 * Delete the Directus flow when workflow is deactivated
+			 */
 			async delete(this: IHookFunctions): Promise<boolean> {
 				const webhookData = this.getWorkflowStaticData('node');
+				if (!webhookData.flowId) return true;
 
-				// Only clean up test flows by default, keep production flow for persistence
-				// Production flow should only be deleted when the trigger node is actually removed
+				const credentials = (await this.getCredentials('directusApi')) as DirectusCredentials;
+				const directusBaseUrl = credentials.url.replace(/\/+$/, '');
+				const flowDeleteUrl = `${directusBaseUrl}/flows/${webhookData.flowId}`;
 
-				if (webhookData.testFlowIds && Array.isArray(webhookData.testFlowIds)) {
-					const credentials = (await this.getCredentials('directusApi')) as {
-						url: string;
-						token: string;
-					};
-					const baseUrl = credentials.url.replace(/\/+$/, '');
-					const urlVariants = [`${baseUrl}/flows`, `${baseUrl}/api/flows`];
-
-					for (const testFlowId of webhookData.testFlowIds) {
-						for (const apiUrl of urlVariants) {
-							try {
-								await this.helpers.httpRequest({
-									method: 'DELETE',
-									url: `${apiUrl}/${testFlowId}`,
-									headers: {
-										Authorization: `Bearer ${credentials.token}`,
-									},
-								});
-								break; // Success, move to next flow
-							} catch {
-								// Try next URL variant or ignore if flow already deleted
-								continue;
-							}
-						}
-					}
-
-					// Clear the test flow IDs
-					delete webhookData.testFlowIds;
+				try {
+					await this.helpers.httpRequest({
+						method: 'DELETE',
+						url: flowDeleteUrl,
+						headers: { Authorization: `Bearer ${credentials.token}` },
+					});
+				} catch {
+					// Ignore errors if flow doesn't exist
 				}
 
+				delete webhookData.flowId;
 				return true;
 			},
 		},
@@ -523,236 +412,88 @@ export class DirectusTrigger implements INodeType {
 		},
 	};
 
+	/**
+	 * Handle incoming webhook from Directus
+	 *
+	 * This function is called when Directus sends an event to n8n.
+	 * It:
+	 * 1. Extracts the event data from Directus webhook payload
+	 * 2. For 'update' events, fetches the full updated record
+	 * 3. Formats the data for the n8n workflow
+	 * 4. Returns the data to trigger the workflow
+	 */
 	async webhook(this: IWebhookFunctions): Promise<IWebhookResponseData> {
 		const bodyData = this.getBodyData();
 		const resource = this.getNodeParameter('resource', 0) as string;
 		const event = this.getNodeParameter('event', 0) as string;
 
-		// Extract the actual webhook payload from Directus
-		// Directus sends the payload in the body field
-		let webhookPayload: unknown;
+		const payload = (bodyData as Partial<DirectusWebhookPayload>) || {};
+		let completeData: Record<string, unknown> =
+			(payload.payload as Record<string, unknown>) ||
+			(payload as Record<string, unknown>) ||
+			({} as Record<string, unknown>);
 
-		if (bodyData && typeof bodyData === 'object' && !Array.isArray(bodyData)) {
-			// Check if it's the Directus webhook format
-			if (
-				(bodyData as { event?: string; payload?: unknown }).event &&
-				(bodyData as { event?: string; payload?: unknown }).payload
-			) {
-				webhookPayload = bodyData;
-			} else if (
-				(bodyData as { body?: { event?: string; payload?: unknown } }).body &&
-				(bodyData as { body?: { event?: string; payload?: unknown } }).body?.event &&
-				(bodyData as { body?: { event?: string; payload?: unknown } }).body?.payload
-			) {
-				// Sometimes the payload is nested in a body field
-				webhookPayload = (bodyData as { body: { event?: string; payload?: unknown } }).body;
-			} else {
-				// Fallback to using the entire bodyData
-				webhookPayload = bodyData;
-			}
-		} else {
-			webhookPayload = bodyData;
-		}
+		// Extract entity ID from payload (check common Directus fields)
+		let entityId =
+			payload.key ||
+			payload.id ||
+			payload.keys?.[0] ||
+			(completeData as { id?: string; key?: string })?.id ||
+			(completeData as { id?: string; key?: string })?.key ||
+			undefined;
 
-		// Process the webhook payload
-		let workflowData: { json: Record<string, unknown> };
+		// For update events, fetch the full updated record from Directus
+		// (Directus webhooks only send partial data for updates)
+		if (event === 'update' && entityId) {
+			const credentials = (await this.getCredentials('directusApi')) as DirectusCredentials;
+			const collection = resource === 'item' ? payload.collection || 'unknown' : undefined;
+			const directusApiEndpoint =
+				resource === 'item' ? `/items/${collection}/${entityId}` : `/${resource}s/${entityId}`;
 
-		if (resource === 'item') {
-			// Extract the item ID from various possible locations in the payload
-			let itemId =
-				(webhookPayload as { key?: string })?.key ||
-				(webhookPayload as { id?: string })?.id ||
-				(webhookPayload as { payload?: { key?: string; id?: string } })?.payload?.id ||
-				(webhookPayload as { payload?: { key?: string; id?: string } })?.payload?.key;
-			let completeData = (webhookPayload as { payload?: unknown })?.payload || webhookPayload;
-			const collection = (webhookPayload as { collection?: string })?.collection || 'unknown';
+			try {
+				const response = await this.helpers.httpRequest({
+					method: 'GET',
+					url: directusApiEndpoint,
+					baseURL: credentials.url,
+					headers: {
+						Authorization: `Bearer ${credentials.token}`,
+						Accept: 'application/json',
+					},
+				});
 
-			// For update events, fetch complete item data to ensure we have the full item
-			if (event === 'update' && itemId) {
-				try {
-					const credentials = (await this.getCredentials('directusApi')) as {
-						url: string;
-						token: string;
-					};
-
-					const response = await this.helpers.httpRequest({
-						method: 'GET',
-						url: `/items/${collection}/${itemId}`,
-						baseURL: credentials.url,
-						headers: {
-							Authorization: `Bearer ${credentials.token}`,
-							Accept: 'application/json',
-						},
-					});
-
-					completeData = response.data.data;
-					// Ensure we have the correct ID from the fetched data
-					itemId = (completeData as { id?: string })?.id || itemId;
-				} catch {
-					// If we can't fetch complete data, use original data
+				const fetchedData = (response as { data?: { data?: unknown } })?.data?.data;
+				if (fetchedData && typeof fetchedData === 'object' && !Array.isArray(fetchedData)) {
+					completeData = fetchedData as Record<string, unknown>;
+					// Re-extract ID from fetched data
+					entityId =
+						(fetchedData as { id?: string; key?: string })?.id ||
+						(fetchedData as { id?: string; key?: string })?.key ||
+						entityId;
 				}
+			} catch {
+				// Use original payload data if fetch fails
 			}
-
-			// For create events, extract ID from the payload
-			if (event === 'create' && completeData) {
-				itemId =
-					(completeData as { id?: string; key?: string })?.id ||
-					(completeData as { id?: string; key?: string })?.key ||
-					itemId;
-			}
-
-			// For delete events, we might only have the key/ID
-			if (event === 'delete') {
-				itemId =
-					(webhookPayload as { key?: string; id?: string })?.key ||
-					(webhookPayload as { key?: string; id?: string })?.id ||
-					itemId;
-			}
-
-			workflowData = {
-				json: {
-					event: (webhookPayload as { event?: string })?.event || `items.${event}`,
-					collection: collection,
-					action: event,
-					payload: completeData,
-					// Always include the item ID for use in other operations
-					id: itemId,
-					key: String(itemId), // For backward compatibility
-					keys: (webhookPayload as { keys?: string[] })?.keys || [String(itemId)],
-					timestamp: new Date().toISOString(),
-				},
-			};
-		} else if (resource === 'user') {
-			// Extract the user ID from various possible locations in the payload
-			let completeData = (webhookPayload as { payload?: unknown })?.payload || webhookPayload;
-			let userId =
-				(webhookPayload as { key?: string })?.key ||
-				(webhookPayload as { id?: string })?.id ||
-				(webhookPayload as { payload?: { key?: string; id?: string } })?.payload?.id ||
-				(webhookPayload as { payload?: { key?: string; id?: string } })?.payload?.key ||
-				(completeData as { id?: string })?.id ||
-				((webhookPayload as { keys?: string[] })?.keys &&
-					(webhookPayload as { keys?: string[] })?.keys?.[0]); // For user webhooks, ID is often in keys array
-
-			// For update events, fetch complete user data
-			if (event === 'update' && userId) {
-				try {
-					const credentials = (await this.getCredentials('directusApi')) as {
-						url: string;
-						token: string;
-					};
-
-					const response = await this.helpers.httpRequest({
-						method: 'GET',
-						url: `/users/${userId}`,
-						baseURL: credentials.url,
-						headers: {
-							Authorization: `Bearer ${credentials.token}`,
-							Accept: 'application/json',
-						},
-					});
-
-					completeData = response.data.data;
-					userId = (completeData as { id?: string })?.id || userId;
-				} catch {
-					// If we can't fetch complete data, use original data
-				}
-			}
-
-			// For create events, extract ID from the payload
-			if (event === 'create' && completeData) {
-				userId =
-					(completeData as { id?: string; key?: string })?.id ||
-					(completeData as { id?: string; key?: string })?.key ||
-					userId;
-			}
-
-			// For delete events, we might only have the key/ID
-			if (event === 'delete') {
-				userId =
-					(webhookPayload as { key?: string; id?: string })?.key ||
-					(webhookPayload as { key?: string; id?: string })?.id ||
-					userId;
-			}
-
-			workflowData = {
-				json: {
-					event: (webhookPayload as { event?: string })?.event || `users.${event}`,
-					action: event,
-					payload: completeData,
-					// Always include the user ID for use in other operations
-					id: userId,
-					key: String(userId), // For backward compatibility
-					keys: (webhookPayload as { keys?: string[] })?.keys || [String(userId)],
-					timestamp: new Date().toISOString(),
-				},
-			};
-		} else if (resource === 'file') {
-			// For file webhooks, only handle upload events
-			// Extract the file ID from various possible locations in the payload
-			const completeData = (webhookPayload as { payload?: unknown })?.payload || webhookPayload;
-			let fileId =
-				(webhookPayload as { key?: string })?.key ||
-				(webhookPayload as { id?: string })?.id ||
-				(webhookPayload as { payload?: { key?: string; id?: string } })?.payload?.id ||
-				(webhookPayload as { payload?: { key?: string; id?: string } })?.payload?.key ||
-				(completeData as { id?: string })?.id ||
-				((webhookPayload as { keys?: string[] })?.keys &&
-					(webhookPayload as { keys?: string[] })?.keys?.[0]); // For file webhooks, ID is often in keys array
-
-			// For upload events, the payload should contain the complete file data
-			if (event === 'upload' && completeData) {
-				fileId =
-					(completeData as { id?: string; key?: string })?.id ||
-					(completeData as { id?: string; key?: string })?.key ||
-					fileId;
-			}
-
-			workflowData = {
-				json: {
-					event: (webhookPayload as { event?: string })?.event || `files.${event}`,
-					action: event,
-					payload: completeData,
-					// Always include the file ID for use in other operations
-					id: fileId,
-					key: String(fileId), // For backward compatibility
-					keys: (webhookPayload as { keys?: string[] })?.keys || [String(fileId)],
-					timestamp: new Date().toISOString(),
-				},
-			};
-		} else {
-			workflowData = {
-				json: {
-					...(webhookPayload as Record<string, unknown>),
-					event: (webhookPayload as { event?: string })?.event || `${resource}.${event}`,
-					timestamp: new Date().toISOString(),
-				},
-			};
 		}
 
-		// Ensure workflowData is properly formatted
-		if (!workflowData || !workflowData.json) {
-			workflowData = {
-				json: {
-					event: (webhookPayload as { event?: string })?.event || `${resource}.${event}`,
-					payload: webhookPayload,
-					timestamp: new Date().toISOString(),
-					error: 'Failed to process webhook data',
-				},
-			};
-		}
+		const eventName = payload.event || `${resource === 'item' ? 'items' : resource + 's'}.${event}`;
+		const collectionName = resource === 'item' ? payload.collection || 'unknown' : undefined;
 
-		// Ensure the data structure is exactly what n8n expects
-		// n8n expects each item to have a 'json' property
-		if (!workflowData.json) {
-			workflowData = { json: workflowData };
-		}
+		// Format data for n8n workflow
+		const workflowData: INodeExecutionData = {
+			json: {
+				event: eventName,
+				...(collectionName && { collection: collectionName }),
+				action: event,
+				payload: completeData,
+				id: entityId ? String(entityId) : undefined,
+				key: String(entityId || ''),
+				keys: payload.keys || (entityId ? [String(entityId)] : []),
+				timestamp: new Date().toISOString(),
+			},
+		};
 
-		// Return the data in the format n8n expects for webhook nodes
-		// n8n expects workflowData to be an array of INodeExecutionData objects
-		// Each item should have a 'json' property containing the actual data
 		return {
-			workflowData: [[workflowData as INodeExecutionData]],
+			workflowData: [[workflowData]],
 		};
 	}
 }

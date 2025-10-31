@@ -67,7 +67,7 @@ describe('DirectusTrigger Node', () => {
 			const result = await node.webhook.call(mockWebhookFunctions);
 
 			expect(result.workflowData![0][0].json.event).toBe('items.create');
-			expect(result.workflowData![0][0].json.id).toBe(1);
+			expect(result.workflowData![0][0].json.id).toBe('1');
 			expect(result.workflowData![0][0].json.collection).toBe('users');
 		});
 
@@ -89,7 +89,7 @@ describe('DirectusTrigger Node', () => {
 			const result = await node.webhook.call(mockWebhookFunctions);
 
 			expect(result.workflowData![0][0].json.event).toBe('users.update');
-			expect(result.workflowData![0][0].json.id).toBe(1);
+			expect(result.workflowData![0][0].json.id).toBe('1');
 		});
 
 		it('should process file webhook', async () => {

@@ -1,165 +1,80 @@
-import { IExecuteFunctions, NodeOperationError, IHttpRequestOptions } from 'n8n-workflow';
-import { processFieldValue } from '../../methods/fields';
+import { IExecuteFunctions, NodeOperationError } from 'n8n-workflow';
+import {
+	executeCreate,
+	executeUpdate,
+	executeDelete,
+	executeGet,
+	executeGetAll,
+	type MakeRequestFn,
+} from '../../methods/crud';
+import type { FieldParameter } from '../../types';
+
+function parseJsonData(context: IExecuteFunctions, jsonData: string | unknown): unknown {
+	if (typeof jsonData === 'string') {
+		try {
+			return JSON.parse(jsonData);
+		} catch {
+			throw new NodeOperationError(context.getNode(), 'Invalid JSON format');
+		}
+	}
+	return jsonData;
+}
 
 export async function executeItemOperations(
 	this: IExecuteFunctions,
 	operation: string,
 	collection: string,
 	itemIndex: number,
-	makeRequest: (options: IHttpRequestOptions) => Promise<unknown>,
+	makeRequest: MakeRequestFn,
 ): Promise<unknown> {
-	type OperationHandler = (
-		self: IExecuteFunctions,
-		collection: string,
-		i: number,
-		makeRequest: (options: IHttpRequestOptions) => Promise<unknown>,
-	) => Promise<unknown>;
+	const resourcePath = `/items/${collection}`;
 
-	const operationMap: Record<string, OperationHandler> = {
-		create: async (
-			self: IExecuteFunctions,
-			col: string,
-			i: number,
-			reqFn: (options: IHttpRequestOptions) => Promise<unknown>,
-		) => {
-			const collectionFields = self.getNodeParameter('collectionFields', i) as {
-				fields?: { field?: Array<{ name: string; value: unknown }> };
-			};
+	switch (operation) {
+		case 'create': {
+			const collectionFields = this.getNodeParameter('collectionFields', itemIndex) as
+				| FieldParameter
+				| undefined;
+			return executeCreate(this, itemIndex, makeRequest, resourcePath, collectionFields);
+		}
 
-			const body: Record<string, unknown> = {};
-
-			if (collectionFields?.fields?.field) {
-				for (const field of collectionFields.fields.field) {
-					if (field.name && field.value !== undefined) {
-						body[field.name] = processFieldValue(field.value);
-					}
-				}
-			}
-
-			return await reqFn({
+		case 'createRaw': {
+			const jsonData = this.getNodeParameter('jsonData', itemIndex);
+			const body = parseJsonData(this, jsonData) as Record<string, unknown>;
+			return await makeRequest({
 				method: 'POST',
-				url: `/items/${col}`,
+				url: resourcePath,
 				body,
 			});
-		},
+		}
 
-		createRaw: async (
-			self: IExecuteFunctions,
-			col: string,
-			i: number,
-			reqFn: (options: IHttpRequestOptions) => Promise<unknown>,
-		) => {
-			const jsonData = self.getNodeParameter('jsonData', i) as string;
-			let body;
-			try {
-				body = typeof jsonData === 'string' ? JSON.parse(jsonData) : jsonData;
-			} catch {
-				throw new NodeOperationError(self.getNode(), 'Invalid JSON format');
-			}
-			return await reqFn({
-				method: 'POST',
-				url: `/items/${col}`,
-				body,
-			});
-		},
+		case 'update': {
+			const collectionFields = this.getNodeParameter('collectionFields', itemIndex) as
+				| FieldParameter
+				| undefined;
+			return executeUpdate(this, itemIndex, makeRequest, resourcePath, 'itemId', collectionFields);
+		}
 
-		update: async (
-			self: IExecuteFunctions,
-			col: string,
-			i: number,
-			reqFn: (options: IHttpRequestOptions) => Promise<unknown>,
-		) => {
-			const itemId = self.getNodeParameter('itemId', i) as string;
-			const collectionFields = self.getNodeParameter('collectionFields', i) as {
-				fields?: { field?: Array<{ name: string; value: unknown }> };
-			};
-
-			const body: Record<string, unknown> = {};
-
-			// Only use fields explicitly set in the UI
-			if (collectionFields?.fields?.field) {
-				for (const field of collectionFields.fields.field) {
-					if (field.name && field.value !== undefined) {
-						body[field.name] = processFieldValue(field.value);
-					}
-				}
-			}
-
-			return await reqFn({
+		case 'updateRaw': {
+			const itemId = this.getNodeParameter('itemId', itemIndex) as string;
+			const jsonData = this.getNodeParameter('jsonData', itemIndex);
+			const body = parseJsonData(this, jsonData) as Record<string, unknown>;
+			return await makeRequest({
 				method: 'PATCH',
-				url: `/items/${col}/${itemId}`,
+				url: `${resourcePath}/${itemId}`,
 				body,
 			});
-		},
+		}
 
-		updateRaw: async (
-			self: IExecuteFunctions,
-			col: string,
-			i: number,
-			reqFn: (options: IHttpRequestOptions) => Promise<unknown>,
-		) => {
-			const itemId = self.getNodeParameter('itemId', i) as string;
-			const jsonData = self.getNodeParameter('jsonData', i) as string;
-			let body;
-			try {
-				body = typeof jsonData === 'string' ? JSON.parse(jsonData) : jsonData;
-			} catch {
-				throw new NodeOperationError(self.getNode(), 'Invalid JSON format');
-			}
-			return await reqFn({
-				method: 'PATCH',
-				url: `/items/${col}/${itemId}`,
-				body,
-			});
-		},
+		case 'delete':
+			return executeDelete(this, itemIndex, makeRequest, resourcePath, 'itemId');
 
-		delete: async (
-			self: IExecuteFunctions,
-			col: string,
-			i: number,
-			reqFn: (options: IHttpRequestOptions) => Promise<unknown>,
-		) => {
-			const itemId = self.getNodeParameter('itemId', i) as string;
-			await reqFn({
-				method: 'DELETE',
-				url: `/items/${col}/${itemId}`,
-			});
-			return { deleted: true, id: itemId };
-		},
+		case 'get':
+			return executeGet(this, itemIndex, makeRequest, resourcePath, 'itemId');
 
-		get: async (
-			self: IExecuteFunctions,
-			col: string,
-			i: number,
-			reqFn: (options: IHttpRequestOptions) => Promise<unknown>,
-		) => {
-			const itemId = self.getNodeParameter('itemId', i) as string;
-			return await reqFn({
-				method: 'GET',
-				url: `/items/${col}/${itemId}`,
-			});
-		},
+		case 'getAll':
+			return executeGetAll(this, itemIndex, makeRequest, resourcePath);
 
-		getAll: async (
-			self: IExecuteFunctions,
-			col: string,
-			i: number,
-			reqFn: (options: IHttpRequestOptions) => Promise<unknown>,
-		) => {
-			const returnAll = self.getNodeParameter('returnAll', i) as boolean;
-			const limit = self.getNodeParameter('limit', i, 50) as number;
-			return await reqFn({
-				method: 'GET',
-				url: `/items/${col}`,
-				qs: returnAll ? {} : { limit },
-			});
-		},
-	};
-
-	const handler = operationMap[operation];
-	if (!handler) {
-		throw new NodeOperationError(this.getNode(), `Unknown operation: ${operation}`);
+		default:
+			throw new NodeOperationError(this.getNode(), `Unknown operation: ${operation}`);
 	}
-
-	return await handler(this, collection, itemIndex, makeRequest);
 }

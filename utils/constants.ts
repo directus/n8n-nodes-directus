@@ -1,14 +1,14 @@
+// Prefix used to identify Directus system collections (e.g., directus_users, directus_files)
 export const SYSTEM_COLLECTION_PREFIX = 'directus_';
 
-export const API_URL_VARIANTS = {
-	COLLECTIONS: ['collections', 'api/collections'],
-	FIELDS: (collection: string) => [`fields/${collection}`, `api/fields/${collection}`],
-	ROLES: ['roles', 'api/roles'],
-	RELATIONS: ['relations', 'api/relations'],
-};
-
+// System fields filtered out from the n8n UI because:
+// 1. They are managed automatically by Directus
+// 2. Users shouldn't manually set them in most cases
+// 3. They clutter the UI with technical fields that aren't relevant for typical operations
 export const SYSTEM_FIELDS = {
+	// Auto-managed audit fields present on all collections
 	COMMON_SYSTEM_FIELDS: ['date_created', 'date_updated', 'user_created', 'user_updated', 'id'],
+	// Sensitive or internal user fields that shouldn't be exposed in the UI
 	USER_SPECIFIC_FIELDS: [
 		'password',
 		'token',
@@ -19,6 +19,7 @@ export const SYSTEM_FIELDS = {
 		'auth_data',
 		'tfa_secret',
 	],
+	// Technical file metadata managed by Directus storage system
 	FILE_SPECIFIC_FIELDS: [
 		'storage',
 		'filename_disk',

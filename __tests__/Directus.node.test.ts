@@ -8,9 +8,6 @@ vi.mock('../nodes/Directus/methods/fields', () => ({
 	getCollections: vi.fn(),
 	convertCollectionFieldsToN8n: vi.fn(),
 	formatDirectusError: vi.fn((error: any) => error.message || 'Unknown error'),
-	processFieldValue: vi.fn((value: any) => value),
-	shouldSkipFieldPublic: vi.fn(() => false),
-	formatDisplayName: vi.fn((field: any) => field.meta?.display_name || field.field),
 }));
 
 vi.mock('../nodes/Directus/methods/api', () => ({
@@ -37,10 +34,10 @@ describe('Directus Node', () => {
 	describe('Load Options', () => {
 		it('should load collections', async () => {
 			const mockCollections = [
-				{ collection: 'users', meta: {} },
-				{ collection: 'posts', meta: {} },
+				{ collection: 'users', schema: null, meta: null },
+				{ collection: 'posts', schema: null, meta: null },
 			];
-			vi.mocked(fieldsUtils.getCollections).mockResolvedValue(mockCollections);
+			vi.mocked(fieldsUtils.getCollections).mockResolvedValue(mockCollections as any);
 
 			const result = await node.methods!.loadOptions!.getCollections.call(mockExecuteFunctions);
 
@@ -49,8 +46,19 @@ describe('Directus Node', () => {
 		});
 
 		it('should load roles', async () => {
-			const mockRoles = [{ id: '1', name: 'admin' }];
-			vi.mocked(apiUtils.getRolesFromAPI).mockResolvedValue(mockRoles);
+			const mockRoles = [
+				{
+					id: '1',
+					name: 'admin',
+					icon: '',
+					description: null,
+					ip_access: null,
+					enforce_tfa: false,
+					admin_access: false,
+					app_access: false,
+				},
+			];
+			vi.mocked(apiUtils.getRolesFromAPI).mockResolvedValue(mockRoles as any);
 
 			const result = await node.methods!.loadOptions!.getRoles.call(mockExecuteFunctions);
 

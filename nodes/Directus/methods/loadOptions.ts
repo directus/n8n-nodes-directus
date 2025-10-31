@@ -1,13 +1,18 @@
 import { ILoadOptionsFunctions, NodeOperationError } from 'n8n-workflow';
-import {
-	getCollections,
-	convertCollectionFieldsToN8n,
-	shouldSkipFieldPublic as shouldSkipField,
-	formatDisplayName,
-	type Field,
-} from './fields';
+import { getCollections, convertCollectionFieldsToN8n } from './fields';
 import { getFieldsFromAPI, getRolesFromAPI } from './api';
 import { SYSTEM_FIELDS } from '../../../utils/constants';
+import { shouldSkipField, formatFieldName } from './utils';
+import type { DirectusField } from '../types';
+
+function handleLoadOptionsError(
+	functions: ILoadOptionsFunctions,
+	error: unknown,
+	resource: string,
+): never {
+	const message = error instanceof Error ? error.message : String(error);
+	throw new NodeOperationError(functions.getNode(), `Failed to load ${resource}: ${message}`);
+}
 
 export async function getCollectionsLoadOptions(
 	this: ILoadOptionsFunctions,
@@ -19,10 +24,7 @@ export async function getCollectionsLoadOptions(
 			value: collection.collection,
 		}));
 	} catch (error) {
-		throw new NodeOperationError(
-			this.getNode(),
-			`Failed to load collections: ${error instanceof Error ? error.message : String(error)}`,
-		);
+		handleLoadOptionsError(this, error, 'collections');
 	}
 }
 
@@ -40,16 +42,13 @@ export async function getCollectionFieldsLoadOptions(
 		const fields = await convertCollectionFieldsToN8n(this, collection, operation === 'create');
 		return fields
 			.map((field) => ({
-				name: field?.displayName || '',
-				value: field?.name || '',
-				description: field?.description || '',
+				name: field.displayName || '',
+				value: field.name || '',
+				description: field.description || '',
 			}))
 			.filter((f) => f.name && f.value);
 	} catch (error) {
-		throw new NodeOperationError(
-			this.getNode(),
-			`Failed to load fields: ${error instanceof Error ? error.message : String(error)}`,
-		);
+		handleLoadOptionsError(this, error, 'fields');
 	}
 }
 
@@ -58,26 +57,28 @@ export async function getRolesLoadOptions(
 ): Promise<Array<{ name: string; value: string }>> {
 	try {
 		const roles = await getRolesFromAPI(this);
-		return roles.map((role: { name?: string; id: string }) => ({
+		return roles.map((role) => ({
 			name: role.name || role.id,
 			value: role.id,
 		}));
 	} catch (error) {
-		throw new NodeOperationError(
-			this.getNode(),
-			`Failed to load roles: ${error instanceof Error ? error.message : String(error)}`,
-		);
+		handleLoadOptionsError(this, error, 'roles');
 	}
 }
 
 function createFieldLoadOptions(
-	fields: Field[],
-	excludedFields: string[],
+	fields: DirectusField[],
+	additionalExcludedFields: string[] = [],
 ): Array<{ name: string; value: string; description: string }> {
+	const excludedFields = new Set([
+		...SYSTEM_FIELDS.COMMON_SYSTEM_FIELDS,
+		...additionalExcludedFields,
+	]);
+
 	return fields
-		.filter((field) => !shouldSkipField(field) && !excludedFields.includes(field.field))
+		.filter((field) => !shouldSkipField(field) && !excludedFields.has(field.field))
 		.map((field) => {
-			const displayName = formatDisplayName(field);
+			const displayName = field.meta?.display_name || formatFieldName(field.field);
 			const isRequired = field.meta?.required ?? false;
 
 			return {
@@ -93,16 +94,9 @@ export async function getUserFieldsLoadOptions(
 ): Promise<Array<{ name: string; value: string }>> {
 	try {
 		const fields = await getFieldsFromAPI(this, 'directus_users');
-		const excludedFields = [
-			...SYSTEM_FIELDS.COMMON_SYSTEM_FIELDS,
-			...SYSTEM_FIELDS.USER_SPECIFIC_FIELDS,
-		];
-		return createFieldLoadOptions(fields, excludedFields);
+		return createFieldLoadOptions(fields, SYSTEM_FIELDS.USER_SPECIFIC_FIELDS);
 	} catch (error) {
-		throw new NodeOperationError(
-			this.getNode(),
-			`Failed to load user fields: ${error instanceof Error ? error.message : String(error)}`,
-		);
+		handleLoadOptionsError(this, error, 'user fields');
 	}
 }
 
@@ -111,15 +105,8 @@ export async function getFileFieldsLoadOptions(
 ): Promise<Array<{ name: string; value: string }>> {
 	try {
 		const fields = await getFieldsFromAPI(this, 'directus_files');
-		const excludedFields = [
-			...SYSTEM_FIELDS.COMMON_SYSTEM_FIELDS,
-			...SYSTEM_FIELDS.FILE_SPECIFIC_FIELDS,
-		];
-		return createFieldLoadOptions(fields, excludedFields);
+		return createFieldLoadOptions(fields, SYSTEM_FIELDS.FILE_SPECIFIC_FIELDS);
 	} catch (error) {
-		throw new NodeOperationError(
-			this.getNode(),
-			`Failed to load file fields: ${error instanceof Error ? error.message : String(error)}`,
-		);
+		handleLoadOptionsError(this, error, 'file fields');
 	}
 }

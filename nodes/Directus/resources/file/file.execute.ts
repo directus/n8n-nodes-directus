@@ -1,31 +1,30 @@
-import { IExecuteFunctions, NodeOperationError, IHttpRequestOptions } from 'n8n-workflow';
-import { processFieldValue } from '../../methods/fields';
+import { IExecuteFunctions, NodeOperationError } from 'n8n-workflow';
+import {
+	executeUpdate,
+	executeDelete,
+	executeGet,
+	executeGetAll,
+	type MakeRequestFn,
+} from '../../methods/crud';
+import type { FieldParameter } from '../../types';
 
 export async function executeFileOperations(
 	this: IExecuteFunctions,
 	operation: string,
 	itemIndex: number,
-	makeRequest: (options: IHttpRequestOptions) => Promise<unknown>,
+	makeRequest: MakeRequestFn,
 ): Promise<unknown> {
-	type OperationHandler = (
-		self: IExecuteFunctions,
-		i: number,
-		makeRequest: (options: IHttpRequestOptions) => Promise<unknown>,
-	) => Promise<unknown>;
+	const resourcePath = '/files';
 
-	const operationMap: Record<string, OperationHandler> = {
-		upload: async (
-			self: IExecuteFunctions,
-			i: number,
-			reqFn: (options: IHttpRequestOptions) => Promise<unknown>,
-		) => {
-			const file = self.getNodeParameter('file', i) as string;
-			const title = self.getNodeParameter('title', i) as string;
-			const description = self.getNodeParameter('description', i) as string;
-			const folder = self.getNodeParameter('folder', i) as string;
+	switch (operation) {
+		case 'upload': {
+			const file = this.getNodeParameter('file', itemIndex) as string;
+			const title = this.getNodeParameter('title', itemIndex) as string;
+			const description = this.getNodeParameter('description', itemIndex) as string;
+			const folder = this.getNodeParameter('folder', itemIndex) as string;
 
 			if (!file) {
-				throw new NodeOperationError(self.getNode(), 'File is required for upload');
+				throw new NodeOperationError(this.getNode(), 'File is required for upload');
 			}
 
 			const body: Record<string, unknown> = { file };
@@ -33,84 +32,30 @@ export async function executeFileOperations(
 			if (description) body.description = description;
 			if (folder) body.folder = folder;
 
-			return await reqFn({
+			return await makeRequest({
 				method: 'POST',
-				url: '/files',
+				url: resourcePath,
 				body,
 			});
-		},
+		}
 
-		update: async (
-			self: IExecuteFunctions,
-			i: number,
-			reqFn: (options: IHttpRequestOptions) => Promise<unknown>,
-		) => {
-			const fileId = self.getNodeParameter('fileId', i) as string;
-			const fileFields = self.getNodeParameter('fileFields', i) as {
-				fields?: { field?: Array<{ name: string; value: unknown }> };
-			};
+		case 'update': {
+			const fileFields = this.getNodeParameter('fileFields', itemIndex) as
+				| FieldParameter
+				| undefined;
+			return executeUpdate(this, itemIndex, makeRequest, resourcePath, 'fileId', fileFields);
+		}
 
-			const body: Record<string, unknown> = {};
+		case 'delete':
+			return executeDelete(this, itemIndex, makeRequest, resourcePath, 'fileId');
 
-			if (fileFields?.fields?.field) {
-				for (const field of fileFields.fields.field) {
-					if (field.name && field.value !== undefined) {
-						body[field.name] = processFieldValue(field.value);
-					}
-				}
-			}
+		case 'get':
+			return executeGet(this, itemIndex, makeRequest, resourcePath, 'fileId');
 
-			return await reqFn({
-				method: 'PATCH',
-				url: `/files/${fileId}`,
-				body,
-			});
-		},
+		case 'getAll':
+			return executeGetAll(this, itemIndex, makeRequest, resourcePath);
 
-		delete: async (
-			self: IExecuteFunctions,
-			i: number,
-			reqFn: (options: IHttpRequestOptions) => Promise<unknown>,
-		) => {
-			const fileId = self.getNodeParameter('fileId', i) as string;
-			await reqFn({
-				method: 'DELETE',
-				url: `/files/${fileId}`,
-			});
-			return { deleted: true, id: fileId };
-		},
-
-		get: async (
-			self: IExecuteFunctions,
-			i: number,
-			reqFn: (options: IHttpRequestOptions) => Promise<unknown>,
-		) => {
-			const fileId = self.getNodeParameter('fileId', i) as string;
-			return await reqFn({
-				method: 'GET',
-				url: `/files/${fileId}`,
-			});
-		},
-
-		getAll: async (
-			self: IExecuteFunctions,
-			i: number,
-			reqFn: (options: IHttpRequestOptions) => Promise<unknown>,
-		) => {
-			const returnAll = self.getNodeParameter('returnAll', i) as boolean;
-			const limit = self.getNodeParameter('limit', i, 50) as number;
-			return await reqFn({
-				method: 'GET',
-				url: '/files',
-				qs: returnAll ? {} : { limit },
-			});
-		},
-	};
-
-	const handler = operationMap[operation];
-	if (!handler) {
-		throw new NodeOperationError(this.getNode(), `Unknown operation: ${operation}`);
+		default:
+			throw new NodeOperationError(this.getNode(), `Unknown operation: ${operation}`);
 	}
-
-	return await handler(this, itemIndex, makeRequest);
 }
