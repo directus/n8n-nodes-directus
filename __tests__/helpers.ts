@@ -44,6 +44,11 @@ export function createMockExecuteFunctions(
 				},
 			}),
 			requestWithAuthentication: vi.fn<any>().mockResolvedValue({ data: { data: [] } }),
+			assertBinaryData: vi.fn<any>().mockReturnValue({
+				fileName: 'test.txt',
+				mimeType: 'text/plain',
+			}),
+			getBinaryDataBuffer: vi.fn<any>().mockResolvedValue(Buffer.from('test content')),
 		},
 		continueOnFail: vi.fn(() => false),
 		getNode: vi.fn(() => ({

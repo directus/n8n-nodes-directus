@@ -45,10 +45,25 @@ npm install @directus/n8n-nodes-directus
 
 #### Directus Node
 
-- **Items**: Create, Read, Update, Delete, Get All items in collections
-- **Users**: Invite, Update, Delete, Get, Get All users with Simplify option
-- **Files**: Upload, Update, Delete, Get, Get All files with Simplify option
-- **Raw JSON Operations**: Create/Update with raw JSON data for advanced use cases
+- **Items**:
+  - Create, Create (Raw JSON)
+  - Get, Get (Raw JSON)
+  - Get Many, Get Many (Raw JSON)
+  - Update, Update (Raw JSON)
+  - Delete
+- **Users**:
+  - Invite
+  - Get, Get (Raw JSON)
+  - Get Many, Get Many (Raw JSON) with Simplify option
+  - Update, Update (Raw JSON)
+  - Delete
+- **Files**:
+  - Upload a File (using binary data from a previous node)
+  - Import a File (from a URL)
+  - Get, Get (Raw JSON)
+  - Get Many, Get Many (Raw JSON) with Simplify option
+  - Update, Update (Raw JSON)
+  - Delete
 
 #### Directus Trigger Node
 
@@ -60,7 +75,8 @@ npm install @directus/n8n-nodes-directus
 
 - **Dynamic Field Loading**: Automatically loads available collections and fields from your Directus instance
 - **Smart Field Processing**: Handles complex field types and relationships
-- **Simplify Option**: Returns essential fields only for Users and Files "Get All" operations
+- **Simplify Option**: Returns essential fields only for Users and Files "Get Many" operations
+- **Raw JSON Operations**: Full support for raw JSON data/query parameters for advanced use cases (available for all CRUD operations)
 - **Robust Error Handling**: Comprehensive error handling with detailed error messages
 - **Webhook Management**: Automatic webhook creation and cleanup for trigger nodes
 - **Type Safety**: Full TypeScript support with proper type definitions
@@ -146,11 +162,6 @@ npm run dev          # Watch mode for TypeScript compilation
 npm run dev:n8n      # Start n8n with your node loaded for testing
 npm run build:n8n    # Build nodes and credentials using n8n-node CLI
 
-# Docker
-npm run docker:dev   # Start n8n in Docker for testing
-npm run docker:down  # Stop n8n Docker containers
-npm run docker:logs  # View n8n Docker logs
-
 # Code Quality
 npm run lint         # Check code style (repo root; tests are ignored by config)
 npm run lintfix      # Fix code style issues
@@ -185,7 +196,10 @@ npm run release       # Publish to npm using n8n-node CLI
 4. **Test operations**:
    - Create a new workflow
    - Add a Directus node
-   - Test various operations (Create, Read, Update, Delete)
+   - Test various operations:
+     - **Items**: Create, Get, Update, Delete items in collections
+     - **Users**: Invite, Get, Update, Delete users
+     - **Files**: Upload (requires binary data from previous node), Import (from URL), Get, Update, Delete files
 
 #### Webhook Testing (Requires ngrok)
 

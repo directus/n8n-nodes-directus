@@ -121,25 +121,15 @@ export function formatDirectusError(error: unknown): Error {
 	return new Error(String(error) || 'An unknown error occurred');
 }
 
-export async function getCollectionsFromAPI(
-	functions: ILoadOptionsFunctions,
-): Promise<DirectusCollection[]> {
-	return fetchFromDirectus<DirectusCollection>(functions, 'collections');
-}
+// API fetch functions - thin wrappers around fetchFromDirectus for type safety and clarity
+export const getCollectionsFromAPI = (functions: ILoadOptionsFunctions) =>
+	fetchFromDirectus<DirectusCollection>(functions, 'collections');
 
-export async function getFieldsFromAPI(
-	functions: ILoadOptionsFunctions,
-	collection: string,
-): Promise<DirectusField[]> {
-	return fetchFromDirectus<DirectusField>(functions, `fields/${collection}`);
-}
+export const getFieldsFromAPI = (functions: ILoadOptionsFunctions, collection: string) =>
+	fetchFromDirectus<DirectusField>(functions, `fields/${collection}`);
 
-export async function getRolesFromAPI(functions: ILoadOptionsFunctions): Promise<DirectusRole[]> {
-	return fetchFromDirectus<DirectusRole>(functions, 'roles');
-}
+export const getRolesFromAPI = (functions: ILoadOptionsFunctions) =>
+	fetchFromDirectus<DirectusRole>(functions, 'roles');
 
-export async function getRelationsFromAPI(
-	functions: ILoadOptionsFunctions,
-): Promise<DirectusRelation[]> {
-	return fetchFromDirectus<DirectusRelation>(functions, 'relations', true);
-}
+export const getRelationsFromAPI = (functions: ILoadOptionsFunctions) =>
+	fetchFromDirectus<DirectusRelation>(functions, 'relations', true);
