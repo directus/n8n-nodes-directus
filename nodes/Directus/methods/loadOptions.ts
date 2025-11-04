@@ -49,19 +49,31 @@ export async function getCollectionFieldsLoadOptions(
 		// Fetch raw fields and converted fields in parallel for better performance
 		const [rawFields, convertedFields] = await Promise.all([
 			getFieldsFromAPI(this, collection),
-			convertCollectionFieldsToN8n(this, collection, false),
+			convertCollectionFieldsToN8n(this, collection),
 		]);
 
 		// Create a map for description fallback
 		const fieldMap = new Map(rawFields.map((f) => [f.field, f]));
 
+		const isCreateOrUpdate = operation === 'create' || operation === 'update';
+
 		return convertedFields
 			.map((field) => {
 				const rawField = fieldMap.get(field.name);
+				const isRequired = rawField?.meta?.required ?? false;
+				const displayName = field.displayName || '';
+
+				// Only show asterisk for required fields on create/update operations
+				const finalDisplayName =
+					isCreateOrUpdate && isRequired
+						? `${displayName.replace(' *', '')} *`
+						: displayName.replace(' *', '');
+
 				return {
-					name: field.displayName || '',
+					name: finalDisplayName,
 					value: field.name || '',
 					description: field.description || rawField?.meta?.note || '',
+					rawField,
 				};
 			})
 			.filter((f) => {
@@ -69,19 +81,40 @@ export async function getCollectionFieldsLoadOptions(
 
 				const fieldName = f.value.toLowerCase();
 				const displayName = f.name.toLowerCase();
+				const isIdField = fieldName === 'id';
+
+				// Handle id field specially: available for get operations, filtered for create/update
+				if (isIdField) {
+					return !isCreateOrUpdate;
+				}
+
+				// Skip if we don't have rawField data
+				if (!f.rawField) {
+					return false;
+				}
+
+				// Filter out hidden fields
+				if (f.rawField.meta?.hidden) {
+					return false;
+				}
+
+				// Filter out readonly fields for update operations
+				if (operation === 'update' && f.rawField.meta?.readonly) {
+					return false;
+				}
 
 				// Filter out fields with "meta" in the name
 				if (displayName.includes('meta') || fieldName.includes('meta')) {
 					return false;
 				}
 
-				// For create operations, remove id field
-				if (operation === 'create' && fieldName === 'id') {
-					return false;
-				}
-
 				return true;
-			});
+			})
+			.map((option) => ({
+				name: option.name,
+				value: option.value,
+				description: option.description,
+			}));
 	} catch (error) {
 		handleLoadOptionsError(this, error, 'fields');
 	}

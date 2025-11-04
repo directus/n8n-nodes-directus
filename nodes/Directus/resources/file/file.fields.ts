@@ -16,57 +16,33 @@ export const fileFields: INodeProperties[] = [
 		description: 'The ID of the file to operate on',
 	},
 	{
+		displayName: 'Upload a File: Requires binary data from a previous node',
+		name: 'uploadNotice',
+		type: 'notice',
+		typeOptions: {
+			noticeType: 'info',
+		},
+		displayOptions: {
+			show: {
+				resource: ['file'],
+				operation: ['upload'],
+			},
+		},
+		default: '',
+	},
+	{
 		displayName: 'File',
 		name: 'file',
 		type: 'string',
 		displayOptions: {
 			show: {
 				resource: ['file'],
-				operation: ['upload'],
+				operation: ['import'],
 			},
 		},
 		default: '',
 		required: true,
-		description: 'The file to upload (binary data or file path)',
-	},
-	{
-		displayName: 'Title',
-		name: 'title',
-		type: 'string',
-		displayOptions: {
-			show: {
-				resource: ['file'],
-				operation: ['upload'],
-			},
-		},
-		default: '',
-		description: 'Title for the uploaded file',
-	},
-	{
-		displayName: 'Description',
-		name: 'description',
-		type: 'string',
-		displayOptions: {
-			show: {
-				resource: ['file'],
-				operation: ['upload'],
-			},
-		},
-		default: '',
-		description: 'Description for the uploaded file',
-	},
-	{
-		displayName: 'Folder',
-		name: 'folder',
-		type: 'string',
-		displayOptions: {
-			show: {
-				resource: ['file'],
-				operation: ['upload'],
-			},
-		},
-		default: '',
-		description: 'Folder ID to upload the file to',
+		description: 'Public URL to fetch the file from. Example: "https://example.com/image.jpg".',
 	},
 	{
 		displayName: 'File Fields',

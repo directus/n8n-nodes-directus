@@ -1,3 +1,5 @@
+import type { IExecuteFunctions } from 'n8n-workflow';
+
 export interface DirectusCredentials {
 	url: string;
 	token: string;
@@ -54,6 +56,7 @@ export interface DirectusFieldMeta {
 	interface: string | null;
 	locked: boolean;
 	hidden: boolean;
+	readonly: boolean;
 	translations: Record<string, string> | null;
 	display: string | null;
 	display_options: Record<string, unknown> | null;
@@ -143,13 +146,39 @@ export interface DirectusFile {
 
 export interface DirectusHttpError {
 	statusCode?: number;
+	status?: number;
 	response?: {
 		statusCode?: number;
-		data?: {
-			errors?: Array<{ message?: string }>;
-			message?: string;
-		};
+		status?: number;
+		statusMessage?: string;
+		data?: unknown;
+		body?: unknown;
 	};
 	message?: string;
 	errors?: Array<{ message?: string }>;
+}
+
+// Type for helpers.request options (deprecated but needed for formData)
+export interface IRequestOptionsWithFormData {
+	method?: string;
+	url: string;
+	headers?: Record<string, string>;
+	formData?: {
+		file?: {
+			value: Buffer;
+			options: {
+				filename: string;
+				contentType: string;
+			};
+		};
+		[key: string]: unknown;
+	};
+	json?: boolean;
+}
+
+// Type extension for IExecuteFunctions helpers to include deprecated request method
+export interface IExecuteFunctionsWithRequest extends IExecuteFunctions {
+	helpers: IExecuteFunctions['helpers'] & {
+		request: (options: IRequestOptionsWithFormData) => Promise<unknown>;
+	};
 }

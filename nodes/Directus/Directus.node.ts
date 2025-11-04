@@ -11,7 +11,13 @@ import {
 import { formatDirectusError } from './methods/api';
 import { simplifyUser, simplifyFile } from './methods/simplify';
 import { createAuthenticatedRequest } from './methods/request';
-import type { DirectusCredentials, DirectusUser, DirectusFile } from './types';
+import type {
+	DirectusCredentials,
+	DirectusUser,
+	DirectusFile,
+	IRequestOptionsWithFormData,
+	IExecuteFunctionsWithRequest,
+} from './types';
 import { itemOperations } from './resources/item/item.operations';
 import { userOperations } from './resources/user/user.operations';
 import { fileOperations } from './resources/file/file.operations';
@@ -149,8 +155,21 @@ export class Directus implements INodeType {
 				const operation = this.getNodeParameter('operation', i) as string;
 
 				const getRequestOptions = createAuthenticatedRequest(credentials);
-				const makeRequest = async (options: IHttpRequestOptions) => {
-					return await this.helpers.httpRequest(getRequestOptions(options));
+				const makeRequest = async (
+					options: IHttpRequestOptions & { formData?: Record<string, unknown> },
+				) => {
+					const requestOptions = getRequestOptions(options);
+					// Check if this is a formData upload (for file uploads)
+					const hasFormData = 'formData' in options && options.formData !== undefined;
+					if (hasFormData) {
+						// Use helpers.request for formData uploads (httpRequest doesn't handle it properly)
+						const helpersWithRequest = this as IExecuteFunctionsWithRequest;
+						return await helpersWithRequest.helpers.request({
+							...requestOptions,
+							formData: options.formData,
+						} as IRequestOptionsWithFormData);
+					}
+					return await this.helpers.httpRequest(requestOptions);
 				};
 
 				let responseData: unknown;
@@ -206,8 +225,14 @@ export class Directus implements INodeType {
 				}
 			} catch (error) {
 				if (this.continueOnFail()) {
+					const errorMessage =
+						error instanceof Error
+							? error.message
+							: typeof error === 'object' && error !== null
+								? JSON.stringify(error)
+								: String(error);
 					returnData.push({
-						json: { error: error instanceof Error ? error.message : String(error) },
+						json: { error: errorMessage },
 						pairedItem: { item: i },
 					});
 				} else {

@@ -43,6 +43,12 @@ export const fileOperations: INodeProperties[] = [
 				action: 'Get many files with raw JSON',
 			},
 			{
+				name: 'Import a File',
+				value: 'import',
+				description: 'Import a file from a URL',
+				action: 'Import a file from URL',
+			},
+			{
 				name: 'Update',
 				value: 'update',
 				description: 'Update file metadata',
@@ -55,12 +61,12 @@ export const fileOperations: INodeProperties[] = [
 				action: 'Update a file with raw JSON',
 			},
 			{
-				name: 'Upload',
+				name: 'Upload a File',
 				value: 'upload',
-				description: 'Upload a new file',
+				description: 'Upload a file using binary data from a previous node',
 				action: 'Upload a file',
 			},
 		],
-		default: 'upload',
+		default: 'import',
 	},
 ];

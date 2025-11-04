@@ -19,23 +19,60 @@ export async function executeFileOperations(
 
 	switch (operation) {
 		case 'upload': {
-			const file = this.getNodeParameter('file', itemIndex) as string;
-			const title = this.getNodeParameter('title', itemIndex) as string;
-			const description = this.getNodeParameter('description', itemIndex) as string;
-			const folder = this.getNodeParameter('folder', itemIndex) as string;
+			// Upload a file using binary data from previous node
+			const items = this.getInputData();
+			const currentItem = items[itemIndex];
+			const binaryData = currentItem?.binary;
+			const binaryKey = Object.keys(binaryData || {})[0];
+			const binaryFile = binaryKey ? binaryData?.[binaryKey] : null;
 
-			if (!file) {
-				throw new NodeOperationError(this.getNode(), 'File is required for upload');
+			if (!binaryFile) {
+				throw new NodeOperationError(
+					this.getNode(),
+					'Binary data is required for file upload. Connect a node that outputs binary data before this node.',
+				);
 			}
 
-			const body: Record<string, unknown> = { file };
-			if (title) body.title = title;
-			if (description) body.description = description;
-			if (folder) body.folder = folder;
+			const binaryDataValidated = this.helpers.assertBinaryData(itemIndex, binaryKey);
+			const buffer = await this.helpers.getBinaryDataBuffer(itemIndex, binaryKey);
+
+			const filename = binaryDataValidated.fileName || binaryFile.fileName || 'file';
+			const contentType =
+				binaryDataValidated.mimeType || binaryFile.mimeType || 'application/octet-stream';
 
 			return await makeRequest({
 				method: 'POST',
 				url: resourcePath,
+				formData: {
+					file: {
+						value: buffer,
+						options: {
+							filename: filename,
+							contentType: contentType,
+						},
+					},
+					type: contentType,
+					storage: 'cloud',
+					filename_download: filename,
+				},
+			});
+		}
+
+		case 'import': {
+			// Import a file from a URL
+			const file = this.getNodeParameter('file', itemIndex) as string;
+			if (!file || file.trim() === '') {
+				throw new NodeOperationError(
+					this.getNode(),
+					'File URL is required for import. Provide a public URL in the File field.',
+				);
+			}
+
+			const body: Record<string, unknown> = { url: file };
+
+			return await makeRequest({
+				method: 'POST',
+				url: `${resourcePath}/import`,
 				body,
 			});
 		}

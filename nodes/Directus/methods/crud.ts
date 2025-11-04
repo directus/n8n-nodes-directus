@@ -3,7 +3,12 @@ import { NodeOperationError } from 'n8n-workflow';
 import type { FieldParameter } from '../types';
 import { buildRequestBody } from './utils';
 
-export type MakeRequestFn = (options: IHttpRequestOptions) => Promise<unknown>;
+// Extended type to support formData for file uploads
+export type MakeRequestOptions = IHttpRequestOptions & {
+	formData?: Record<string, unknown>;
+};
+
+export type MakeRequestFn = (options: MakeRequestOptions) => Promise<unknown>;
 
 export async function executeGet(
 	context: IExecuteFunctions,

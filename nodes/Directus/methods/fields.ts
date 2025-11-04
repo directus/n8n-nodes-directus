@@ -70,8 +70,8 @@ function getFieldRelationshipInfo(
 	return { type: 'o2m', relatedCollection: relation.many_collection || '' };
 }
 
-function createBaseN8nField(field: DirectusField, isCreate = false) {
-	const isRequired = isCreate && (field.meta?.required ?? false);
+function createBaseN8nField(field: DirectusField) {
+	const isRequired = field.meta?.required ?? false;
 	const displayName = field.meta?.display_name || formatFieldName(field.field);
 
 	return {
@@ -84,12 +84,8 @@ function createBaseN8nField(field: DirectusField, isCreate = false) {
 	};
 }
 
-function convertDirectusFieldToN8n(
-	field: DirectusField,
-	isCreate = false,
-	relations: DirectusRelation[] = [],
-) {
-	const n8nField = createBaseN8nField(field, isCreate);
+function convertDirectusFieldToN8n(field: DirectusField, relations: DirectusRelation[] = []) {
+	const n8nField = createBaseN8nField(field);
 	const fieldType = field.type.toLowerCase();
 	const interfaceType = field.meta?.interface?.toLowerCase() || '';
 
@@ -202,7 +198,6 @@ export async function getCollections(
 export async function convertCollectionFieldsToN8n(
 	functions: ILoadOptionsFunctions,
 	collection: string,
-	isCreate = false,
 ) {
 	const fields = await getFields(functions, collection);
 	const hasRelationshipFields = fields.some(isRelationshipField);
@@ -210,5 +205,5 @@ export async function convertCollectionFieldsToN8n(
 		? await getCollectionRelations(functions, collection)
 		: [];
 
-	return fields.map((field) => convertDirectusFieldToN8n(field, isCreate, relations));
+	return fields.map((field) => convertDirectusFieldToN8n(field, relations));
 }
