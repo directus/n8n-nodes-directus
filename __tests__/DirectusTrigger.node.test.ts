@@ -23,7 +23,7 @@ describe('DirectusTrigger Node', () => {
 	});
 
 	describe('Webhook Management', () => {
-		it('should create webhook flow', async () => {
+		it('should create webhook flow for item events', async () => {
 			mockWebhookFunctions.getNodeParameter
 				.mockReturnValueOnce('item')
 				.mockReturnValueOnce('create')
@@ -32,21 +32,57 @@ describe('DirectusTrigger Node', () => {
 			mockWebhookFunctions.helpers.httpRequest
 				.mockResolvedValueOnce({ data: { data: [] } })
 				.mockResolvedValueOnce({ data: { id: 'flow-id' } })
+				.mockResolvedValueOnce({ data: { id: 'operation-id' } })
 				.mockResolvedValueOnce({});
 
 			const result = await node.webhookMethods!.default!.create.call(mockWebhookFunctions);
 
 			expect(result).toBe(true);
+			expect(mockWebhookFunctions.helpers.httpRequest).toHaveBeenCalledTimes(4);
+		});
+
+		it('should create webhook flow with script filter for user.update', async () => {
+			mockWebhookFunctions.getNodeParameter
+				.mockReturnValueOnce('user')
+				.mockReturnValueOnce('update')
+				.mockReturnValueOnce('directus_users');
+			mockWebhookFunctions.getWorkflowStaticData.mockReturnValue({});
+			mockWebhookFunctions.helpers.httpRequest
+				.mockResolvedValueOnce({ data: { data: [] } })
+				.mockResolvedValueOnce({ data: { id: 'flow-id' } })
+				.mockResolvedValueOnce({ data: { id: 'webhook-op-id' } })
+				.mockResolvedValueOnce({ data: { id: 'script-op-id' } })
+				.mockResolvedValueOnce({});
+
+			const result = await node.webhookMethods!.default!.create.call(mockWebhookFunctions);
+
+			expect(result).toBe(true);
+			expect(mockWebhookFunctions.helpers.httpRequest).toHaveBeenCalledTimes(5);
+			// Verify script operation was created with correct code
+			const scriptCall = mockWebhookFunctions.helpers.httpRequest.mock.calls.find(
+				(call: any[]) => call[0]?.body?.type === 'exec',
+			);
+			expect(scriptCall).toBeDefined();
+			expect(scriptCall[0].body.options.code).toContain('last_page');
 		});
 
 		it('should delete webhook flow', async () => {
-			const staticData = { testFlowIds: ['flow-1'] };
+			const staticData = { flowId: 'flow-1' };
 			mockWebhookFunctions.getWorkflowStaticData.mockReturnValue(staticData);
 			mockWebhookFunctions.helpers.httpRequest.mockResolvedValue({});
+			mockWebhookFunctions.getCredentials.mockResolvedValue({
+				url: 'https://example.com',
+				token: 'test-token',
+			});
 
 			const result = await node.webhookMethods!.default!.delete.call(mockWebhookFunctions);
 
 			expect(result).toBe(true);
+			expect(mockWebhookFunctions.helpers.httpRequest).toHaveBeenCalledWith(
+				expect.objectContaining({
+					method: 'DELETE',
+				}),
+			);
 		});
 	});
 

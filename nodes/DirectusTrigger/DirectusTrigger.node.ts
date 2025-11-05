@@ -214,7 +214,6 @@ export class DirectusTrigger implements INodeType {
 					: n8nWebhookUrl.replace('webhook', 'webhook-test');
 				const prodWebhookUrl = n8nWebhookUrl.replace('webhook-test', 'webhook');
 
-				// Directus flow configuration
 				const flowConfig = {
 					icon: 'bolt',
 					status: 'active',
@@ -248,92 +247,180 @@ export class DirectusTrigger implements INodeType {
 						}
 					}
 				} catch {
-					// Continue with empty array if fetch fails
+					// Continue if fetch fails
 				}
 
-				// Find flows by exact name match
 				const existingTestFlow = existingFlows.find((flow) => flow.name === testFlowName);
 				const existingProdFlow = existingFlows.find((flow) => flow.name === prodFlowName);
 
-				/**
-				 * Create or reuse a Directus flow and configure it to send events to n8n webhook
-				 */
 				const setupFlow = async (
 					flowName: string,
 					webhookUrl: string,
 					existingFlow?: { id: string },
 				): Promise<string> => {
-					let flowId: string;
+					const isUserUpdate = resource === 'user' && event === 'update';
+					const operationsApiUrl = directusFlowsApiUrl.replace('/flows', '/operations');
 
-					// Reuse existing flow or create new one
+					let flowId: string;
 					if (existingFlow) {
 						flowId = existingFlow.id;
 					} else {
-						const response = await this.helpers.httpRequest({
+						const createFlowResp = await this.helpers.httpRequest({
 							method: 'POST',
 							url: directusFlowsApiUrl,
 							headers: {
 								Authorization: `Bearer ${credentials.token}`,
 								'Content-Type': 'application/json',
 							},
-							body: {
-								...flowConfig,
-								name: flowName,
-							},
+							body: { ...flowConfig, name: flowName },
 						});
 
-						const parsedResponse = typeof response === 'string' ? JSON.parse(response) : response;
+						const parsed =
+							typeof createFlowResp === 'string' ? JSON.parse(createFlowResp) : createFlowResp;
+						flowId = parsed?.data?.id;
 
-						if (parsedResponse?.data?.id) {
-							flowId = parsedResponse.data.id;
-						} else {
+						if (!flowId) {
 							throw new NodeOperationError(this.getNode(), `Failed to create flow: ${flowName}`);
 						}
 					}
 
-					// Configure the flow to send events to n8n webhook
-					const flowOperationUrl = `${directusFlowsApiUrl}/${flowId}`;
-					try {
-						await this.helpers.httpRequest({
-							method: 'PATCH',
-							url: flowOperationUrl,
+					if (!isUserUpdate) {
+						const createReqOpResp = await this.helpers.httpRequest({
+							method: 'POST',
+							url: operationsApiUrl,
 							headers: {
 								Authorization: `Bearer ${credentials.token}`,
 								'Content-Type': 'application/json',
 							},
 							body: {
 								flow: flowId,
-								operation: {
-									name: 'Send to n8n',
-									key: 'send_to_n8n',
-									type: 'request',
-									position_x: 19,
-									position_y: 1,
-									flow: flowId,
-									options: {
-										method: 'POST',
-										url: webhookUrl,
-										headers: [{ header: 'Content-Type', value: 'application/json' }],
-										body: '{{$trigger}}',
-									},
+								name: 'Send to n8n',
+								key: 'send_to_n8n',
+								type: 'request',
+								position_x: 19,
+								position_y: 1,
+								options: {
+									method: 'POST',
+									url: webhookUrl,
+									headers: [{ header: 'Content-Type', value: 'application/json' }],
+									body: '{{$trigger}}',
 								},
 							},
 						});
-					} catch (error) {
-						// Cleanup: delete flow if configuration failed
-						await this.helpers
-							.httpRequest({
-								method: 'DELETE',
-								url: flowOperationUrl,
-								headers: { Authorization: `Bearer ${credentials.token}` },
-							})
-							.catch(() => {});
 
+						const reqOp =
+							typeof createReqOpResp === 'string' ? JSON.parse(createReqOpResp) : createReqOpResp;
+						const reqOpId = reqOp?.data?.id;
+
+						if (!reqOpId) {
+							throw new NodeOperationError(
+								this.getNode(),
+								`Failed to create request op for ${flowName}`,
+							);
+						}
+
+						await this.helpers.httpRequest({
+							method: 'PATCH',
+							url: `${directusFlowsApiUrl}/${flowId}`,
+							headers: {
+								Authorization: `Bearer ${credentials.token}`,
+								'Content-Type': 'application/json',
+							},
+							body: { operation: reqOpId },
+						});
+
+						return flowId;
+					}
+
+					// Special handling for user.update: Directus automatically updates the `last_page` field
+					// whenever a user navigates, causing unwanted webhook triggers. We use a script operation
+					// to filter out updates that only contain `last_page`, allowing real user updates to proceed.
+					const createReqOpResp = await this.helpers.httpRequest({
+						method: 'POST',
+						url: operationsApiUrl,
+						headers: {
+							Authorization: `Bearer ${credentials.token}`,
+							'Content-Type': 'application/json',
+						},
+						body: {
+							flow: flowId,
+							name: 'Send to n8n',
+							key: 'send_to_n8n',
+							type: 'request',
+							position_x: 38,
+							position_y: 1,
+							options: {
+								method: 'POST',
+								url: webhookUrl,
+								headers: [{ header: 'Content-Type', value: 'application/json' }],
+								body: '{{$trigger}}',
+							},
+						},
+					});
+
+					const reqOp =
+						typeof createReqOpResp === 'string' ? JSON.parse(createReqOpResp) : createReqOpResp;
+					const reqOpId = reqOp?.data?.id;
+
+					if (!reqOpId) {
 						throw new NodeOperationError(
 							this.getNode(),
-							`Failed to configure ${flowName}: ${(error as Error).message}`,
+							`Failed to create request op for ${flowName}`,
 						);
 					}
+
+					const createScriptOpResp = await this.helpers.httpRequest({
+						method: 'POST',
+						url: operationsApiUrl,
+						headers: {
+							Authorization: `Bearer ${credentials.token}`,
+							'Content-Type': 'application/json',
+						},
+						body: {
+							flow: flowId,
+							name: 'Filter last_page updates',
+							key: 'filter_last_page',
+							type: 'exec',
+							position_x: 19,
+							position_y: 1,
+							options: {
+								code: `module.exports = async function(data) {
+	const payload = data.$trigger.payload || {};
+	const payloadKeys = Object.keys(payload);
+	const onlyLastPage = payloadKeys.length === 1 && payloadKeys[0] === 'last_page';
+	if (onlyLastPage) {
+		throw new Error('Skipping last_page update');
+	}
+	return data.$trigger;
+};`,
+							},
+							resolve: reqOpId,
+							reject: null,
+						},
+					});
+
+					const scriptOp =
+						typeof createScriptOpResp === 'string'
+							? JSON.parse(createScriptOpResp)
+							: createScriptOpResp;
+					const scriptOpId = scriptOp?.data?.id;
+
+					if (!scriptOpId) {
+						throw new NodeOperationError(
+							this.getNode(),
+							`Failed to create script op for ${flowName}`,
+						);
+					}
+
+					await this.helpers.httpRequest({
+						method: 'PATCH',
+						url: `${directusFlowsApiUrl}/${flowId}`,
+						headers: {
+							Authorization: `Bearer ${credentials.token}`,
+							'Content-Type': 'application/json',
+						},
+						body: { operation: scriptOpId },
+					});
 
 					return flowId;
 				};
@@ -346,13 +433,12 @@ export class DirectusTrigger implements INodeType {
 						await setupFlow(prodFlowName, prodWebhookUrl, existingProdFlow);
 
 						const webhookData = this.getWorkflowStaticData('node');
-						webhookData.flowId = testFlowId; // Store test flow ID for cleanup
+						webhookData.flowId = testFlowId;
 					} else {
-						// Production mode: only create/update production flow
 						const prodFlowId = await setupFlow(prodFlowName, prodWebhookUrl, existingProdFlow);
 
 						const webhookData = this.getWorkflowStaticData('node');
-						webhookData.flowId = prodFlowId; // Store prod flow ID for cleanup
+						webhookData.flowId = prodFlowId;
 					}
 				} catch (error) {
 					throw new NodeOperationError(
@@ -382,7 +468,7 @@ export class DirectusTrigger implements INodeType {
 						headers: { Authorization: `Bearer ${credentials.token}` },
 					});
 				} catch {
-					// Ignore errors if flow doesn't exist
+					// Flow may already be deleted
 				}
 
 				delete webhookData.flowId;
