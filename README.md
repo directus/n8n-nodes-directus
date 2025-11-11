@@ -1,48 +1,332 @@
-![Banner image](https://user-images.githubusercontent.com/10284570/173569848-c624317f-42b1-45a6-ab09-f0ea3c247648.png)
+# n8n-nodes-directus
 
-# n8n-nodes-starter
+A comprehensive n8n community node package for integrating with Directus CMS.
 
-This repo contains example nodes to help you get started building your own custom integrations for [n8n](https://n8n.io). It includes the node linter and other dependencies.
+[n8n](https://n8n.io/) is a [fair-code licensed](https://docs.n8n.io/reference/license/) workflow automation platform.
 
-To make your custom node available to the community, you must create it as an npm package, and [submit it to the npm registry](https://docs.npmjs.com/packages-and-modules/contributing-packages-to-the-registry).
+## Installation
 
-If you would like your node to be available on n8n cloud you can also [submit your node for verification](https://docs.n8n.io/integrations/creating-nodes/deploy/submit-community-nodes/).
+Follow the [installation guide](https://docs.n8n.io/integrations/community-nodes/installation/) in the n8n community nodes documentation.
 
-## Prerequisites
+### Package Name
 
-You need the following installed on your development machine:
+The package is published as `@directus/n8n-nodes-directus` on npm.
 
-* [git](https://git-scm.com/downloads)
-* Node.js and npm. Minimum version Node 20. You can find instructions on how to install both using nvm (Node Version Manager) for Linux, Mac, and WSL [here](https://github.com/nvm-sh/nvm). For Windows users, refer to Microsoft's guide to [Install NodeJS on Windows](https://docs.microsoft.com/en-us/windows/dev-environment/javascript/nodejs-on-windows).
-* Install n8n with:
-  ```
-  npm install n8n -g
-  ```
-* Recommended: follow n8n's guide to [set up your development environment](https://docs.n8n.io/integrations/creating-nodes/build/node-development-environment/).
+### From npm (when published)
 
-## Using this starter
+```bash
+npm install @directus/n8n-nodes-directus
+```
 
-These are the basic steps for working with the starter. For detailed guidance on creating and publishing nodes, refer to the [documentation](https://docs.n8n.io/integrations/creating-nodes/).
+**Note**: This package is not yet published to npm. For development and testing, see the [Development](#development) section below.
 
-1. [Generate a new repository](https://github.com/n8n-io/n8n-nodes-starter/generate) from this template repository.
-2. Clone your new repo:
+## Usage
+
+### Getting Started
+
+1. **Install the package** (when published):
+
+   ```bash
+   npm install @directus/n8n-nodes-directus
+
+   # Or using pnpm
+   pnpm add @directus/n8n-nodes-directus
    ```
-   git clone https://github.com/<your organization>/<your-repo-name>.git
+
+2. **Configure credentials** in n8n:
+   - Add your Directus URL (e.g., `https://your-directus.app`)
+   - Add your Directus API token with appropriate permissions
+
+3. **Use the nodes** in your workflows:
+   - **Directus Node**: For CRUD operations on items, users, and files
+   - **Directus Trigger Node**: For webhook-based automation
+
+### Available Operations
+
+#### Directus Node
+
+- **Items**:
+  - Create, Create (Raw JSON)
+  - Get, Get (Raw JSON)
+  - Get Many, Get Many (Raw JSON)
+  - Update, Update (Raw JSON)
+  - Delete
+- **Users**:
+  - Invite
+  - Get, Get (Raw JSON)
+  - Get Many, Get Many (Raw JSON) with Simplify option
+  - Update, Update (Raw JSON)
+  - Delete
+- **Files**:
+  - Upload a File (using binary data from a previous node)
+  - Import a File (from a URL)
+  - Get, Get (Raw JSON)
+  - Get Many, Get Many (Raw JSON) with Simplify option
+  - Update, Update (Raw JSON)
+  - Delete
+
+#### Directus Trigger Node
+
+- **Item Events**: Trigger on create, update, delete operations in collections
+- **User Events**: Trigger on user creation, updates, and deletions
+- **File Events**: Trigger on file uploads and updates
+
+## Features
+
+- **Dynamic Field Loading**: Automatically loads available collections and fields from your Directus instance
+- **Smart Field Processing**: Handles complex field types and relationships
+- **Simplify Option**: Returns essential fields only for Users and Files "Get Many" operations
+- **Raw JSON Operations**: Full support for raw JSON data/query parameters for advanced use cases (available for all CRUD operations)
+- **Robust Error Handling**: Comprehensive error handling with detailed error messages
+- **Webhook Management**: Automatic webhook creation and cleanup for trigger nodes
+- **Type Safety**: Full TypeScript support with proper type definitions
+- **UX Compliance**: Follows n8n community node UX guidelines with proper naming and placeholders
+
+## Credentials
+
+### Directus API
+
+Configure your Directus instance connection:
+
+- **Directus URL**: Your Directus instance URL (e.g., `https://your-directus.app`)
+- **Token**: Your Directus API token with appropriate permissions
+
+## Compatibility
+
+- **Directus Cloud**: Fully supported
+- **Self-hosted Directus**: Fully supported
+- **Directus Versions**: Compatible with Directus 10.0+
+
+## Development
+
+This project uses the official n8n-node CLI tool for development and follows n8n community node standards.
+
+### Prerequisites
+
+- **Node.js 22+**
+- **npm 10+**
+- **Directus instance** for testing (cloud or self-hosted)
+- **ngrok** (for webhook testing) - install from [ngrok.com](https://ngrok.com/)
+
+### Setup
+
+```bash
+# Clone the repository
+git clone https://github.com/directus/n8n-nodes-directus.git
+cd n8n-nodes-directus
+
+# Install dependencies
+npm install
+
+# Build the project
+npm run build
+```
+
+### Quick Start
+
+1. **Start n8n with your node loaded**:
+
+   ```bash
+   npm run dev:n8n
    ```
-3. Run `npm i` to install dependencies.
-4. Open the project in your editor.
-5. Browse the examples in `/nodes` and `/credentials`. Modify the examples, or replace them with your own nodes.
-6. Update the `package.json` to match your details.
-7. Run `npm run lint` to check for errors or `npm run lintfix` to automatically fix errors when possible.
-8. Test your node locally. Refer to [Run your node locally](https://docs.n8n.io/integrations/creating-nodes/test/run-node-locally/) for guidance.
-9. Replace this README with documentation for your node. Use the [README_TEMPLATE](README_TEMPLATE.md) to get started.
-10. Update the LICENSE file to use your details.
-11. [Publish](https://docs.npmjs.com/packages-and-modules/contributing-packages-to-the-registry) your package to npm.
 
-## More information
+   This will:
+   - Link your custom node to n8n
+   - Start n8n development server
+   - Make your Directus nodes available in n8n
 
-Refer to our [documentation on creating nodes](https://docs.n8n.io/integrations/creating-nodes/) for detailed information on building your own nodes.
+2. **Access n8n**: Open http://localhost:5678 in your browser
+
+3. **Configure credentials**:
+   - Add your Directus API credentials
+   - Test the connection
+
+4. **Create workflows**: Use the Directus nodes in your workflows
+
+### Project Structure
+
+```
+├── credentials/         # Directus API credentials
+├── nodes/               # n8n nodes (Directus and DirectusTrigger)
+├── __tests__/           # Test files
+├── dist/                # Built/compiled files (generated)
+└── package.json         # Package configuration
+```
+
+### Available Commands
+
+```bash
+# Development
+npm run build        # Build the project (TypeScript compilation + assets)
+npm run dev          # Watch mode for TypeScript compilation
+npm run dev:n8n      # Start n8n with your node loaded for testing
+npm run build:n8n    # Build nodes and credentials using n8n-node CLI
+
+# Code Quality
+npm run lint         # Check code style (repo root; tests are ignored by config)
+npm run lintfix      # Fix code style issues
+npm run format       # Format code using Prettier
+
+# Testing
+npm run test          # Run test suite
+npm run test:watch    # Run tests in watch mode
+npm run test:coverage # Run tests with coverage report
+
+# Publishing
+npm run release       # Publish to npm using n8n-node CLI
+```
+
+### Testing
+
+#### Basic Node Testing
+
+1. **Start n8n with your node loaded**:
+
+   ```bash
+   npm run dev:n8n
+   ```
+
+2. **Access n8n**: Open http://localhost:5678 in your browser
+
+3. **Configure credentials**:
+   - Go to **Credentials** → **Add Credential**
+   - Search for "Directus API" and add your credentials
+   - Test the connection
+
+4. **Test operations**:
+   - Create a new workflow
+   - Add a Directus node
+   - Test various operations:
+     - **Items**: Create, Get, Update, Delete items in collections
+     - **Users**: Invite, Get, Update, Delete users
+     - **Files**: Upload (requires binary data from previous node), Import (from URL), Get, Update, Delete files
+
+#### Webhook Testing (Requires ngrok)
+
+For testing the **Directus Trigger** node, you need to expose n8n via a public URL since Directus cannot reach localhost:
+
+1. **Install ngrok** (if not already installed):
+
+   ```bash
+   # macOS with Homebrew
+   brew install ngrok
+
+   # Or download from https://ngrok.com/
+   ```
+
+2. **Start n8n** (in one terminal):
+
+   ```bash
+   npm run dev:n8n
+   ```
+
+3. **Start ngrok** (in another terminal):
+
+   ```bash
+   ngrok http 5678
+   ```
+
+   This will give you a public URL like `https://abc123.ngrok-free.dev`
+
+4. **Create a webhook workflow**:
+   - Add a **Directus Trigger** node
+   - Configure the trigger (resource, event, collection)
+   - Activate the workflow
+   - Copy the webhook URL from n8n
+
+5. **Update Directus webhook**:
+   - In Directus, go to **Settings → Flows**
+   - Find the created flow and edit it
+   - Replace `localhost:5678` with your ngrok URL
+   - Save the flow
+
+6. **Test the webhook**:
+   - Create/update items in Directus
+   - Check if the webhook triggers in n8n
+
+**Note**: The manual URL replacement step is required because Directus cannot reach localhost URLs directly.
+
+### Troubleshooting
+
+#### Common Issues
+
+1. **n8n not starting**:
+   - Ensure Node.js 22+ is installed
+   - Run `pnpm install` to install dependencies
+   - Check if port 5678 is available
+
+2. **Node not appearing in n8n**:
+   - Run `npm run build` first
+   - Restart `npm run dev:n8n`
+   - Check the terminal for any error messages
+
+3. **Webhook not triggering**:
+   - Ensure ngrok is running and accessible
+   - Verify the webhook URL in Directus flows
+   - Check n8n workflow is activated
+   - Test the ngrok URL directly in browser
+
+4. **Build errors**:
+   - Run `npm run lint` to check for code issues
+   - Run `npm run lintfix` to auto-fix issues
+   - Ensure TypeScript compilation passes
+
+#### Getting Help
+
+- Check the [GitHub Issues](https://github.com/directus/n8n-nodes-directus/issues) for known problems
+- Run `pnpm test` to verify everything works
+- Use `pnpm test:coverage` to see test coverage
+
+## Contributing
+
+We welcome feedback and suggestions! Please help us improve this community node:
+
+### Reporting Issues
+
+- **Bug Reports**: Use the [GitHub Issues](https://github.com/directus/n8n-nodes-directus/issues) page to report bugs
+- **Feature Requests**: Submit enhancement ideas through GitHub Issues
+- **Documentation**: Help improve our documentation by reporting unclear sections
+
+### Issue Guidelines
+
+When reporting issues, please provide:
+
+- Detailed description of the problem or feature request
+- Steps to reproduce (for bugs)
+- Expected vs actual behavior
+- Your Directus version and n8n version
+- Any relevant error messages or logs
+
+### Code Contributions
+
+While we appreciate community interest, we maintain this node internally to ensure:
+
+- Consistent code quality and style
+- Proper testing and validation
+- Alignment with Directus and n8n best practices
+- Timely maintenance and updates
+
+If you have specific code improvements or bug fixes, please:
+
+1. **Open an issue first** describing the problem or improvement
+2. **Wait for our team to review** and potentially implement the change
+3. **Provide detailed information** to help us understand the requirement
+
+This approach ensures the node remains reliable, well-tested, and follows n8n community node verification guidelines.
+
+## Resources
+
+- [n8n Community Nodes Documentation](https://docs.n8n.io/integrations/community-nodes/installation/)
+- [Directus API Documentation](https://directus.io/docs/api)
 
 ## License
 
-[MIT](https://github.com/n8n-io/n8n-nodes-starter/blob/master/LICENSE.md)
+MIT License - see [LICENSE](LICENSE) file for details.
+
+## Support
+
+For issues and questions:
+
+- [GitHub Issues](https://github.com/directus/n8n-nodes-directus/issues)
+- [Directus Community](https://community.directus.io/)
+- [n8n Community](https://community.n8n.io/)

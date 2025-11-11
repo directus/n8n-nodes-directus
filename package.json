@@ -1,55 +1,66 @@
 {
-  "name": "n8n-nodes-<...>",
-  "version": "0.1.0",
-  "description": "",
-  "keywords": [
-    "n8n-community-node-package"
-  ],
-  "license": "MIT",
-  "homepage": "",
-  "author": {
-    "name": "",
-    "email": ""
-  },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/<...>/n8n-nodes-<...>.git"
-  },
-  "engines": {
-    "node": ">=20.15"
-  },
-  "main": "index.js",
-  "scripts": {
-    "build": "npx rimraf dist && tsc && gulp build:icons",
-    "dev": "tsc --watch",
-    "format": "prettier nodes credentials --write",
-    "lint": "eslint nodes credentials package.json",
-    "lintfix": "eslint nodes credentials package.json --fix",
-    "prepublishOnly": "npm run build && npm run lint -c .eslintrc.prepublish.js nodes credentials package.json"
-  },
-  "files": [
-    "dist"
-  ],
-  "n8n": {
-    "n8nNodesApiVersion": 1,
-    "credentials": [
-      "dist/credentials/ExampleCredentialsApi.credentials.js",
-      "dist/credentials/HttpBinApi.credentials.js"
-    ],
-    "nodes": [
-      "dist/nodes/ExampleNode/ExampleNode.node.js",
-      "dist/nodes/HttpBin/HttpBin.node.js"
-    ]
-  },
-  "devDependencies": {
-    "@typescript-eslint/parser": "~8.32.0",
-    "eslint": "^8.57.0",
-    "eslint-plugin-n8n-nodes-base": "^1.16.3",
-    "gulp": "^5.0.0",
-    "prettier": "^3.5.3",
-    "typescript": "^5.8.2"
-  },
-  "peerDependencies": {
-    "n8n-workflow": "*"
-  }
+	"name": "@directus/n8n-nodes-directus",
+	"version": "1.0.0",
+	"description": "n8n community node package for Directus CMS integration",
+	"keywords": [
+		"n8n-community-node-package",
+		"directus",
+		"cms"
+	],
+	"license": "MIT",
+	"homepage": "https://github.com/directus/n8n-nodes-directus",
+	"author": {
+		"name": "Directus Labs",
+		"email": "hello@directus.io"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/directus/n8n-nodes-directus.git"
+	},
+	"engines": {
+		"node": ">=22.0.0"
+	},
+	"packageManager": "npm@10.9.0",
+	"main": "index.js",
+	"scripts": {
+		"build": "npx rimraf dist && tsc && gulp build:icons",
+		"build:n8n": "n8n-node build",
+		"dev": "tsc --watch",
+		"dev:n8n": "n8n-node dev",
+		"format": "prettier 'nodes/**/*ts' 'credentials/**/*.ts' 'utils/**/*.ts' --write",
+		"lint": "eslint .",
+		"lintfix": "eslint . --fix",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage",
+		"release": "n8n-node release",
+		"prepublishOnly": "npm run build && eslint -c eslint.config.prepublish.mjs ."
+	},
+	"files": [
+		"dist"
+	],
+	"n8n": {
+		"n8nNodesApiVersion": 1,
+		"credentials": [
+			"dist/credentials/DirectusApi.credentials.js"
+		],
+		"nodes": [
+			"dist/nodes/Directus/Directus.node.js",
+			"dist/nodes/DirectusTrigger/DirectusTrigger.node.js"
+		]
+	},
+	"devDependencies": {
+		"@n8n/node-cli": "*",
+		"@typescript-eslint/eslint-plugin": "~8.32.0",
+		"@typescript-eslint/parser": "~8.32.0",
+		"eslint": "^9.32.0",
+		"eslint-plugin-n8n-nodes-base": "^1.16.3",
+		"gulp": "^5.0.0",
+		"prettier": "^3.5.3",
+		"typescript": "^5.8.2",
+		"vitest": "^2.1.8"
+	},
+	"peerDependencies": {
+		"n8n-workflow": "*"
+	}
 }
