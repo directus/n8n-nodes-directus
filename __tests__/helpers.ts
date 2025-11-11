@@ -7,14 +7,6 @@ export function mockDirectusCredentials() {
 	};
 }
 
-export function mockSuccessfulHttpRequest(data: any) {
-	return vi.fn<any>().mockResolvedValue({ data });
-}
-
-export function mockFailedHttpRequest(error: string) {
-	return vi.fn<any>().mockRejectedValue(new Error(error));
-}
-
 export function createMockExecuteFunctions(
 	options: {
 		nodeParameters: any;

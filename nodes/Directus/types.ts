@@ -3,7 +3,6 @@ import type { IExecuteFunctions } from 'n8n-workflow';
 export interface DirectusCredentials {
 	url: string;
 	token: string;
-	environment: 'cloud' | 'self-hosted';
 }
 
 export interface DirectusRelation {
@@ -181,4 +180,13 @@ export interface IExecuteFunctionsWithRequest extends IExecuteFunctions {
 	helpers: IExecuteFunctions['helpers'] & {
 		request: (options: IRequestOptionsWithFormData) => Promise<unknown>;
 	};
+}
+
+export interface DirectusWebhookPayload {
+	event: string;
+	payload: Record<string, unknown>;
+	collection?: string;
+	key?: string;
+	id?: string;
+	keys?: string[];
 }

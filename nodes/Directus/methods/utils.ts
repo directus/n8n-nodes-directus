@@ -1,6 +1,6 @@
 import type { IExecuteFunctions } from 'n8n-workflow';
 import { NodeOperationError } from 'n8n-workflow';
-import type { FieldParameter, DirectusField } from '../types';
+import type { FieldParameter } from '../types';
 
 export function buildRequestBody(fieldParams: FieldParameter | undefined): Record<string, unknown> {
 	const body: Record<string, unknown> = {};
@@ -14,18 +14,6 @@ export function buildRequestBody(fieldParams: FieldParameter | undefined): Recor
 	}
 
 	return body;
-}
-
-export function shouldSkipField(field: DirectusField): boolean {
-	if (!field?.meta) return true;
-	const special = field.meta.special || [];
-	return (
-		special.includes('m2a') ||
-		field.meta.locked ||
-		field.meta.hidden ||
-		field.type === 'alias' ||
-		field.field?.startsWith('$')
-	);
 }
 
 export function formatFieldName(input: string): string {

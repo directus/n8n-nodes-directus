@@ -43,23 +43,6 @@ export class DirectusApi implements ICredentialType {
 				'Without sufficient permissions, you may encounter 403 Forbidden errors when using this integration.',
 			required: true,
 		},
-		{
-			displayName: 'Environment',
-			name: 'environment',
-			type: 'options',
-			options: [
-				{
-					name: 'Cloud',
-					value: 'cloud',
-				},
-				{
-					name: 'Self-hosted',
-					value: 'self-hosted',
-				},
-			],
-			default: 'cloud',
-			description: 'The type of Directus instance you are connecting to',
-		},
 	];
 
 	authenticate: IAuthenticateGeneric = {
