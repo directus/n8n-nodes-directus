@@ -29,6 +29,5 @@
 		"nodes/**/*",
 		"nodes/**/*.json",
 		"package.json",
-		"utils/**/*"
 	]
 }

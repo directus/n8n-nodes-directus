@@ -27,7 +27,7 @@
 		"build:n8n": "n8n-node build",
 		"dev": "tsc --watch",
 		"dev:n8n": "n8n-node dev",
-		"format": "prettier 'nodes/**/*ts' 'credentials/**/*.ts' 'utils/**/*.ts' --write",
+		"format": "prettier 'nodes/**/*ts' 'credentials/**/*.ts' --write",
 		"lint": "eslint .",
 		"lintfix": "eslint . --fix",
 		"test": "vitest run",
