@@ -23,7 +23,7 @@
 	"packageManager": "npm@10.9.0",
 	"main": "index.js",
 	"scripts": {
-		"build": "npx rimraf dist && tsc && gulp build:icons",
+		"build": "npx rimraf dist tsconfig.tsbuildinfo && tsc && gulp build:icons",
 		"build:n8n": "n8n-node build",
 		"dev": "tsc --watch",
 		"dev:n8n": "n8n-node dev",
