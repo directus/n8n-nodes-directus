@@ -1,2 +1,8 @@
 .DS_Store
 *.tsbuildinfo
+**/*.tsbuildinfo
+__tests__/
+vitest.config.*
+dist/__tests__/
+dist/vitest.config.*
+dist/tsconfig.tsbuildinfo

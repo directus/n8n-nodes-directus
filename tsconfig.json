@@ -16,18 +16,11 @@
 		"esModuleInterop": true,
 		"resolveJsonModule": true,
 		"incremental": true,
+		"tsBuildInfoFile": "./tsconfig.tsbuildinfo",
 		"declaration": true,
 		"sourceMap": true,
 		"skipLibCheck": true,
 		"outDir": "./dist/"
 	},
-	"include": [
-		"credentials/**/*",
-		"nodes/**/*",
-		"nodes/**/*.json",
-		"package.json",
-		"__tests__/**/*",
-		"utils/**/*",
-		"vitest.config.ts"
-	]
+	"include": ["credentials/**/*", "nodes/**/*", "nodes/**/*.json", "utils/**/*"]
 }
