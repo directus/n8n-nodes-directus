@@ -4,7 +4,5 @@ node_modules
 tmp
 dist
 npm-debug.log*
-yarn.lock
-pnpm-lock.yaml
 .vscode/launch.json
 *.tsbuildinfo
