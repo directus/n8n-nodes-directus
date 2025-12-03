@@ -217,7 +217,9 @@ describe('Directus Node', () => {
 					.mockReturnValueOnce('user')
 					.mockReturnValueOnce('update')
 					.mockReturnValueOnce('user-1')
-					.mockReturnValueOnce({ fields: { field: [{ name: 'email', value: 'updated@example.com' }] } });
+					.mockReturnValueOnce({
+						fields: { field: [{ name: 'email', value: 'updated@example.com' }] },
+					});
 
 				mockExecuteFunctions.helpers.httpRequest.mockResolvedValue({
 					data: { id: 'user-1', email: 'updated@example.com' },
@@ -244,74 +246,74 @@ describe('Directus Node', () => {
 
 		describe('File Operations', () => {
 			it('should handle file upload operations', async () => {
-			mockExecuteFunctions.getNodeParameter
-				.mockReturnValueOnce('file')
-				.mockReturnValueOnce('upload');
+				mockExecuteFunctions.getNodeParameter
+					.mockReturnValueOnce('file')
+					.mockReturnValueOnce('upload');
 
-			const mockBinaryData = {
-				file: {
-					data: Buffer.from('test file content').toString('base64'),
+				const mockBinaryData = {
+					file: {
+						data: Buffer.from('test file content').toString('base64'),
+						fileName: 'test.txt',
+						mimeType: 'text/plain',
+					},
+				};
+				mockExecuteFunctions.getInputData.mockReturnValue([{ binary: mockBinaryData }]);
+				mockExecuteFunctions.helpers.assertBinaryData.mockReturnValue({
 					fileName: 'test.txt',
 					mimeType: 'text/plain',
-				},
-			};
-			mockExecuteFunctions.getInputData.mockReturnValue([{ binary: mockBinaryData }]);
-			mockExecuteFunctions.helpers.assertBinaryData.mockReturnValue({
-				fileName: 'test.txt',
-				mimeType: 'text/plain',
-			});
-			mockExecuteFunctions.helpers.getBinaryDataBuffer.mockResolvedValue(
-				Buffer.from('test file content'),
-			);
-			mockExecuteFunctions.helpers.request = vi.fn().mockResolvedValue({
-				data: { id: 'file-1', filename_download: 'test.txt' },
-			});
+				});
+				mockExecuteFunctions.helpers.getBinaryDataBuffer.mockResolvedValue(
+					Buffer.from('test file content'),
+				);
+				mockExecuteFunctions.helpers.request = vi.fn().mockResolvedValue({
+					data: { id: 'file-1', filename_download: 'test.txt' },
+				});
 
-			const result = await node.execute.call(mockExecuteFunctions);
+				const result = await node.execute.call(mockExecuteFunctions);
 
-			expect(result[0][0].json).toHaveProperty('id', 'file-1');
-			expect(mockExecuteFunctions.helpers.request).toHaveBeenCalled();
-		});
-
-		it('should handle file import operations', async () => {
-			mockExecuteFunctions.getNodeParameter
-				.mockReturnValueOnce('file')
-				.mockReturnValueOnce('import')
-				.mockReturnValueOnce('https://example.com/image.jpg');
-
-			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue({
-				data: { id: 'file-2', filename_download: 'image.jpg' },
+				expect(result[0][0].json).toHaveProperty('id', 'file-1');
+				expect(mockExecuteFunctions.helpers.request).toHaveBeenCalled();
 			});
 
-			const result = await node.execute.call(mockExecuteFunctions);
+			it('should handle file import operations', async () => {
+				mockExecuteFunctions.getNodeParameter
+					.mockReturnValueOnce('file')
+					.mockReturnValueOnce('import')
+					.mockReturnValueOnce('https://example.com/image.jpg');
 
-			expect(result[0][0].json).toHaveProperty('id', 'file-2');
-		});
+				mockExecuteFunctions.helpers.httpRequest.mockResolvedValue({
+					data: { id: 'file-2', filename_download: 'image.jpg' },
+				});
 
-		it('should handle file get operations', async () => {
-			mockExecuteFunctions.getNodeParameter
-				.mockReturnValueOnce('file')
-				.mockReturnValueOnce('get')
-				.mockReturnValueOnce('file-3');
+				const result = await node.execute.call(mockExecuteFunctions);
 
-			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue({
-				data: { id: 'file-3', filename_download: 'document.pdf' },
+				expect(result[0][0].json).toHaveProperty('id', 'file-2');
 			});
 
-			const result = await node.execute.call(mockExecuteFunctions);
+			it('should handle file get operations', async () => {
+				mockExecuteFunctions.getNodeParameter
+					.mockReturnValueOnce('file')
+					.mockReturnValueOnce('get')
+					.mockReturnValueOnce('file-3');
 
-			expect(result[0][0].json).toHaveProperty('id', 'file-3');
-		});
+				mockExecuteFunctions.helpers.httpRequest.mockResolvedValue({
+					data: { id: 'file-3', filename_download: 'document.pdf' },
+				});
 
-		it('should handle file delete operations', async () => {
-			mockExecuteFunctions.getNodeParameter
-				.mockReturnValueOnce('file')
-				.mockReturnValueOnce('delete')
-				.mockReturnValueOnce('file-4');
+				const result = await node.execute.call(mockExecuteFunctions);
 
-			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue({});
+				expect(result[0][0].json).toHaveProperty('id', 'file-3');
+			});
 
-			const result = await node.execute.call(mockExecuteFunctions);
+			it('should handle file delete operations', async () => {
+				mockExecuteFunctions.getNodeParameter
+					.mockReturnValueOnce('file')
+					.mockReturnValueOnce('delete')
+					.mockReturnValueOnce('file-4');
+
+				mockExecuteFunctions.helpers.httpRequest.mockResolvedValue({});
+
+				const result = await node.execute.call(mockExecuteFunctions);
 
 				expect(result[0][0].json).toEqual({ deleted: true, id: 'file-4' });
 			});
