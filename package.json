@@ -1,6 +1,6 @@
 {
 	"name": "@directus/n8n-nodes-directus",
-	"version": "1.0.2",
+	"version": "1.0.3",
 	"description": "n8n community node package for Directus CMS integration",
 	"keywords": [
 		"n8n-community-node-package",
