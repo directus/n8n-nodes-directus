@@ -27,10 +27,9 @@ export async function checkExists(this: IHookFunctions): Promise<boolean> {
 	const flowCheckUrl = `${directusBaseUrl}/flows/${webhookData.flowId}`;
 
 	try {
-		await this.helpers.httpRequest({
+		await this.helpers.httpRequestWithAuthentication.call(this, 'directusApi', {
 			method: 'GET',
 			url: flowCheckUrl,
-			headers: { Authorization: `Bearer ${credentials.token}` },
 		});
 		return true;
 	} catch (error: unknown) {
@@ -108,11 +107,10 @@ export async function create(this: IHookFunctions): Promise<boolean> {
 	// Check if flows already exist (to avoid duplicates)
 	let existingFlows: Array<{ id: string; name?: string }> = [];
 	try {
-		const response = await this.helpers.httpRequest({
+		const response = await this.helpers.httpRequestWithAuthentication.call(this, 'directusApi', {
 			method: 'GET',
 			url: directusFlowsApiUrl,
 			headers: {
-				Authorization: `Bearer ${credentials.token}`,
 				Accept: 'application/json',
 			},
 		});
@@ -144,15 +142,18 @@ export async function create(this: IHookFunctions): Promise<boolean> {
 		if (existingFlow) {
 			flowId = existingFlow.id;
 		} else {
-			const createFlowResp = await this.helpers.httpRequest({
-				method: 'POST',
-				url: directusFlowsApiUrl,
-				headers: {
-					Authorization: `Bearer ${credentials.token}`,
-					'Content-Type': 'application/json',
+			const createFlowResp = await this.helpers.httpRequestWithAuthentication.call(
+				this,
+				'directusApi',
+				{
+					method: 'POST',
+					url: directusFlowsApiUrl,
+					headers: {
+						'Content-Type': 'application/json',
+					},
+					body: { ...flowConfig, name: flowName },
 				},
-				body: { ...flowConfig, name: flowName },
-			});
+			);
 
 			const parsed =
 				typeof createFlowResp === 'string' ? JSON.parse(createFlowResp) : createFlowResp;
@@ -164,28 +165,31 @@ export async function create(this: IHookFunctions): Promise<boolean> {
 		}
 
 		if (!isUserUpdate) {
-			const createReqOpResp = await this.helpers.httpRequest({
-				method: 'POST',
-				url: operationsApiUrl,
-				headers: {
-					Authorization: `Bearer ${credentials.token}`,
-					'Content-Type': 'application/json',
-				},
-				body: {
-					flow: flowId,
-					name: 'Send to n8n',
-					key: 'send_to_n8n',
-					type: 'request',
-					position_x: 19,
-					position_y: 1,
-					options: {
-						method: 'POST',
-						url: webhookUrl,
-						headers: [{ header: 'Content-Type', value: 'application/json' }],
-						body: '{{$trigger}}',
+			const createReqOpResp = await this.helpers.httpRequestWithAuthentication.call(
+				this,
+				'directusApi',
+				{
+					method: 'POST',
+					url: operationsApiUrl,
+					headers: {
+						'Content-Type': 'application/json',
+					},
+					body: {
+						flow: flowId,
+						name: 'Send to n8n',
+						key: 'send_to_n8n',
+						type: 'request',
+						position_x: 19,
+						position_y: 1,
+						options: {
+							method: 'POST',
+							url: webhookUrl,
+							headers: [{ header: 'Content-Type', value: 'application/json' }],
+							body: '{{$trigger}}',
+						},
 					},
 				},
-			});
+			);
 
 			const reqOp =
 				typeof createReqOpResp === 'string' ? JSON.parse(createReqOpResp) : createReqOpResp;
@@ -195,11 +199,10 @@ export async function create(this: IHookFunctions): Promise<boolean> {
 				throw new NodeOperationError(this.getNode(), `Failed to create request op for ${flowName}`);
 			}
 
-			await this.helpers.httpRequest({
+			await this.helpers.httpRequestWithAuthentication.call(this, 'directusApi', {
 				method: 'PATCH',
 				url: `${directusFlowsApiUrl}/${flowId}`,
 				headers: {
-					Authorization: `Bearer ${credentials.token}`,
 					'Content-Type': 'application/json',
 				},
 				body: { operation: reqOpId },
@@ -211,28 +214,31 @@ export async function create(this: IHookFunctions): Promise<boolean> {
 		// Special handling for user.update: Directus automatically updates the `last_page` field
 		// whenever a user navigates, causing unwanted webhook triggers. We use a script operation
 		// to filter out updates that only contain `last_page`, allowing real user updates to proceed.
-		const createReqOpResp = await this.helpers.httpRequest({
-			method: 'POST',
-			url: operationsApiUrl,
-			headers: {
-				Authorization: `Bearer ${credentials.token}`,
-				'Content-Type': 'application/json',
-			},
-			body: {
-				flow: flowId,
-				name: 'Send to n8n',
-				key: 'send_to_n8n',
-				type: 'request',
-				position_x: 38,
-				position_y: 1,
-				options: {
-					method: 'POST',
-					url: webhookUrl,
-					headers: [{ header: 'Content-Type', value: 'application/json' }],
-					body: '{{$trigger}}',
+		const createReqOpResp = await this.helpers.httpRequestWithAuthentication.call(
+			this,
+			'directusApi',
+			{
+				method: 'POST',
+				url: operationsApiUrl,
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: {
+					flow: flowId,
+					name: 'Send to n8n',
+					key: 'send_to_n8n',
+					type: 'request',
+					position_x: 38,
+					position_y: 1,
+					options: {
+						method: 'POST',
+						url: webhookUrl,
+						headers: [{ header: 'Content-Type', value: 'application/json' }],
+						body: '{{$trigger}}',
+					},
 				},
 			},
-		});
+		);
 
 		const reqOp =
 			typeof createReqOpResp === 'string' ? JSON.parse(createReqOpResp) : createReqOpResp;
@@ -242,22 +248,24 @@ export async function create(this: IHookFunctions): Promise<boolean> {
 			throw new NodeOperationError(this.getNode(), `Failed to create request op for ${flowName}`);
 		}
 
-		const createScriptOpResp = await this.helpers.httpRequest({
-			method: 'POST',
-			url: operationsApiUrl,
-			headers: {
-				Authorization: `Bearer ${credentials.token}`,
-				'Content-Type': 'application/json',
-			},
-			body: {
-				flow: flowId,
-				name: 'Filter last_page updates',
-				key: 'filter_last_page',
-				type: 'exec',
-				position_x: 19,
-				position_y: 1,
-				options: {
-					code: `module.exports = async function(data) {
+		const createScriptOpResp = await this.helpers.httpRequestWithAuthentication.call(
+			this,
+			'directusApi',
+			{
+				method: 'POST',
+				url: operationsApiUrl,
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: {
+					flow: flowId,
+					name: 'Filter last_page updates',
+					key: 'filter_last_page',
+					type: 'exec',
+					position_x: 19,
+					position_y: 1,
+					options: {
+						code: `module.exports = async function(data) {
 	const payload = data.$trigger.payload || {};
 	const payloadKeys = Object.keys(payload);
 	const onlyLastPage = payloadKeys.length === 1 && payloadKeys[0] === 'last_page';
@@ -266,11 +274,12 @@ export async function create(this: IHookFunctions): Promise<boolean> {
 	}
 	return data.$trigger;
 };`,
+					},
+					resolve: reqOpId,
+					reject: null,
 				},
-				resolve: reqOpId,
-				reject: null,
 			},
-		});
+		);
 
 		const scriptOp =
 			typeof createScriptOpResp === 'string' ? JSON.parse(createScriptOpResp) : createScriptOpResp;
@@ -280,11 +289,10 @@ export async function create(this: IHookFunctions): Promise<boolean> {
 			throw new NodeOperationError(this.getNode(), `Failed to create script op for ${flowName}`);
 		}
 
-		await this.helpers.httpRequest({
+		await this.helpers.httpRequestWithAuthentication.call(this, 'directusApi', {
 			method: 'PATCH',
 			url: `${directusFlowsApiUrl}/${flowId}`,
 			headers: {
-				Authorization: `Bearer ${credentials.token}`,
 				'Content-Type': 'application/json',
 			},
 			body: { operation: scriptOpId },
@@ -330,10 +338,9 @@ export async function deleteWebhook(this: IHookFunctions): Promise<boolean> {
 	const flowDeleteUrl = `${directusBaseUrl}/flows/${webhookData.flowId}`;
 
 	try {
-		await this.helpers.httpRequest({
+		await this.helpers.httpRequestWithAuthentication.call(this, 'directusApi', {
 			method: 'DELETE',
 			url: flowDeleteUrl,
-			headers: { Authorization: `Bearer ${credentials.token}` },
 		});
 	} catch {
 		// Flow may already be deleted

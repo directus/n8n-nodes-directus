@@ -86,6 +86,12 @@ export function createMockWebhookFunctions(
 					id: 'flow-id-123',
 				},
 			}),
+			httpRequestWithAuthentication: vi.fn<any>().mockResolvedValue({
+				data: {
+					data: [{ id: 1, name: 'Test User' }],
+					id: 'flow-id-123',
+				},
+			}),
 		},
 		getCredentials: vi.fn<any>().mockResolvedValue(mockDirectusCredentials()),
 		getWorkflowStaticData: vi.fn(() => ({ flowId: undefined })),

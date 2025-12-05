@@ -18,8 +18,6 @@ The package is published as `@directus/n8n-nodes-directus` on npm.
 npm install @directus/n8n-nodes-directus
 ```
 
-**Note**: This package is not yet published to npm. For development and testing, see the [Development](#development) section below.
-
 ## Usage
 
 ### Getting Started
@@ -143,63 +141,7 @@ npm run build
 
 4. **Create workflows**: Use the Directus nodes in your workflows
 
-### Project Structure
-
-```
-├── credentials/         # Directus API credentials
-├── nodes/               # n8n nodes (Directus and DirectusTrigger)
-├── __tests__/           # Test files
-├── dist/                # Built/compiled files (generated)
-└── package.json         # Package configuration
-```
-
-### Available Commands
-
-```bash
-# Development
-npm run build        # Build the project (TypeScript compilation + assets)
-npm run dev          # Watch mode for TypeScript compilation
-npm run dev:n8n      # Start n8n with your node loaded for testing
-npm run build:n8n    # Build nodes and credentials using n8n-node CLI
-
-# Code Quality
-npm run lint         # Check code style (repo root; tests are ignored by config)
-npm run lintfix      # Fix code style issues
-npm run format       # Format code using Prettier
-
-# Testing
-npm run test          # Run test suite
-npm run test:watch    # Run tests in watch mode
-npm run test:coverage # Run tests with coverage report
-
-# Publishing
-npm run release       # Publish to npm using n8n-node CLI
-```
-
 ### Testing
-
-#### Basic Node Testing
-
-1. **Start n8n with your node loaded**:
-
-   ```bash
-   npm run dev:n8n
-   ```
-
-2. **Access n8n**: Open http://localhost:5678 in your browser
-
-3. **Configure credentials**:
-   - Go to **Credentials** → **Add Credential**
-   - Search for "Directus API" and add your credentials
-   - Test the connection
-
-4. **Test operations**:
-   - Create a new workflow
-   - Add a Directus node
-   - Test various operations:
-     - **Items**: Create, Get, Update, Delete items in collections
-     - **Users**: Invite, Get, Update, Delete users
-     - **Files**: Upload (requires binary data from previous node), Import (from URL), Get, Update, Delete files
 
 #### Webhook Testing (Requires ngrok)
 
@@ -246,32 +188,7 @@ For testing the **Directus Trigger** node, you need to expose n8n via a public U
 
 **Note**: The manual URL replacement step is required because Directus cannot reach localhost URLs directly.
 
-### Troubleshooting
-
-#### Common Issues
-
-1. **n8n not starting**:
-   - Ensure Node.js 22+ is installed
-   - Run `pnpm install` to install dependencies
-   - Check if port 5678 is available
-
-2. **Node not appearing in n8n**:
-   - Run `npm run build` first
-   - Restart `npm run dev:n8n`
-   - Check the terminal for any error messages
-
-3. **Webhook not triggering**:
-   - Ensure ngrok is running and accessible
-   - Verify the webhook URL in Directus flows
-   - Check n8n workflow is activated
-   - Test the ngrok URL directly in browser
-
-4. **Build errors**:
-   - Run `npm run lint` to check for code issues
-   - Run `npm run lintfix` to auto-fix issues
-   - Ensure TypeScript compilation passes
-
-#### Getting Help
+### Getting Help
 
 - Check the [GitHub Issues](https://github.com/directus/n8n-nodes-directus/issues) for known problems
 - Run `pnpm test` to verify everything works
