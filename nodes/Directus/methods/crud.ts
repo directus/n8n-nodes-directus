@@ -58,6 +58,8 @@ export async function executeGetAll(
 	const queryParams: Record<string, string | number> = {};
 	if (!returnAll) {
 		queryParams.limit = limit;
+	} else {
+		queryParams.limit = -1;
 	}
 	if (fields && fields.length > 0) {
 		queryParams.fields = fields.join(',');
