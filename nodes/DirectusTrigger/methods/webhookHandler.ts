@@ -38,14 +38,14 @@ export async function handleWebhook(this: IWebhookFunctions): Promise<IWebhookRe
 		const collection = resource === 'item' ? payload.collection || 'unknown' : undefined;
 		const directusApiEndpoint =
 			resource === 'item' ? `/items/${collection}/${entityId}` : `/${resource}s/${entityId}`;
+		const baseUrl = credentials.url.replace(/\/+$/, '');
+		const fullUrl = `${baseUrl}${directusApiEndpoint}`;
 
 		try {
-			const response = await this.helpers.httpRequest({
+			const response = await this.helpers.httpRequestWithAuthentication.call(this, 'directusApi', {
 				method: 'GET',
-				url: directusApiEndpoint,
-				baseURL: credentials.url,
+				url: fullUrl,
 				headers: {
-					Authorization: `Bearer ${credentials.token}`,
 					Accept: 'application/json',
 				},
 			});

@@ -5,6 +5,7 @@ import {
 	executeDelete,
 	executeGet,
 	executeGetAll,
+	normalizeRequiredId,
 	type MakeRequestFn,
 } from '../../methods/crud';
 import type { FieldParameter } from '../../types';
@@ -41,11 +42,23 @@ export async function executeItemOperations(
 			const collectionFields = this.getNodeParameter('collectionFields', itemIndex) as
 				| FieldParameter
 				| undefined;
-			return executeUpdate(this, itemIndex, makeRequest, resourcePath, 'itemId', collectionFields);
+			return executeUpdate(
+				this,
+				itemIndex,
+				makeRequest,
+				resourcePath,
+				'itemId',
+				collectionFields,
+				'item',
+			);
 		}
 
 		case 'updateRaw': {
-			const itemId = this.getNodeParameter('itemId', itemIndex) as string;
+			const itemId = normalizeRequiredId(
+				this,
+				this.getNodeParameter('itemId', itemIndex),
+				'Item ID is required for updateRaw operation',
+			);
 			const jsonData = this.getNodeParameter('jsonData', itemIndex);
 			const body = parseJsonData(this, jsonData) as Record<string, unknown>;
 			return await makeRequest({
@@ -56,16 +69,17 @@ export async function executeItemOperations(
 		}
 
 		case 'delete':
-			return executeDelete(this, itemIndex, makeRequest, resourcePath, 'itemId');
+			return executeDelete(this, itemIndex, makeRequest, resourcePath, 'itemId', 'item');
 
 		case 'get':
 			return executeGet(this, itemIndex, makeRequest, resourcePath, 'itemId', 'itemFields', 'item');
 
 		case 'getRaw': {
-			const itemId = this.getNodeParameter('itemId', itemIndex) as string;
-			if (!itemId || itemId.trim() === '') {
-				throw new NodeOperationError(this.getNode(), 'Item ID is required for getRaw operation');
-			}
+			const itemId = normalizeRequiredId(
+				this,
+				this.getNodeParameter('itemId', itemIndex),
+				'Item ID is required for getRaw operation',
+			);
 			const queryParamsJson = this.getNodeParameter('queryParameters', itemIndex) as string;
 			let queryParams: IDataObject = {};
 			if (queryParamsJson) {

@@ -26,9 +26,6 @@ npm install @directus/n8n-nodes-directus
 
    ```bash
    npm install @directus/n8n-nodes-directus
-
-   # Or using pnpm
-   pnpm add @directus/n8n-nodes-directus
    ```
 
 2. **Configure credentials** in n8n:
@@ -191,12 +188,14 @@ For testing the **Directus Trigger** node, you need to expose n8n via a public U
 ### Getting Help
 
 - Check the [GitHub Issues](https://github.com/directus/n8n-nodes-directus/issues) for known problems
-- Run `pnpm test` to verify everything works
-- Use `pnpm test:coverage` to see test coverage
+- Run `npm test` to verify everything works
+- Use `npm run test:coverage` to see test coverage
 
 ## Contributing
 
 We welcome feedback and suggestions! Please help us improve this community node:
+
+Maintainers may also refer to [docs/maintainer-notes.md](docs/maintainer-notes.md) for lockfile refreshes, closing superseded Dependabot PRs, and notes on expression-based credential fields.
 
 ### Reporting Issues
 
