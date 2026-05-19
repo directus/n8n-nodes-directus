@@ -4,6 +4,7 @@ import {
 	executeDelete,
 	executeGet,
 	executeGetAll,
+	normalizeRequiredId,
 	type MakeRequestFn,
 } from '../../methods/crud';
 import type { FieldParameter } from '../../types';
@@ -50,11 +51,15 @@ export async function executeUserOperations(
 			const userFields = this.getNodeParameter('userFields', itemIndex) as
 				| FieldParameter
 				| undefined;
-			return executeUpdate(this, itemIndex, makeRequest, resourcePath, 'userId', userFields);
+			return executeUpdate(this, itemIndex, makeRequest, resourcePath, 'userId', userFields, 'user');
 		}
 
 		case 'updateRaw': {
-			const userId = this.getNodeParameter('userId', itemIndex) as string;
+			const userId = normalizeRequiredId(
+				this,
+				this.getNodeParameter('userId', itemIndex),
+				'User ID is required for updateRaw operation',
+			);
 			const jsonData = this.getNodeParameter('jsonData', itemIndex);
 			const body = parseJsonData(this, jsonData) as Record<string, unknown>;
 			return await makeRequest({
@@ -65,7 +70,7 @@ export async function executeUserOperations(
 		}
 
 		case 'delete':
-			return executeDelete(this, itemIndex, makeRequest, resourcePath, 'userId');
+			return executeDelete(this, itemIndex, makeRequest, resourcePath, 'userId', 'user');
 
 		case 'get':
 			return executeGet(
@@ -79,10 +84,11 @@ export async function executeUserOperations(
 			);
 
 		case 'getRaw': {
-			const userId = this.getNodeParameter('userId', itemIndex) as string;
-			if (!userId || userId.trim() === '') {
-				throw new NodeOperationError(this.getNode(), 'User ID is required for getRaw operation');
-			}
+			const userId = normalizeRequiredId(
+				this,
+				this.getNodeParameter('userId', itemIndex),
+				'User ID is required for getRaw operation',
+			);
 			const queryParamsJson = this.getNodeParameter('queryParameters', itemIndex) as string;
 			let queryParams: IDataObject = {};
 			if (queryParamsJson) {

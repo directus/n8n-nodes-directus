@@ -10,6 +10,29 @@ export type MakeRequestOptions = IHttpRequestOptions & {
 
 export type MakeRequestFn = (options: MakeRequestOptions) => Promise<unknown>;
 
+function idLabelForResource(resourceName?: string): string {
+	const resource = resourceName || 'item';
+	if (resource === 'item') return 'Item ID';
+	if (resource === 'user') return 'User ID';
+	return 'File ID';
+}
+
+/** Coerce n8n parameter values (string | number | etc.) to a non-empty ID string for URL segments. */
+export function normalizeRequiredId(
+	context: IExecuteFunctions,
+	raw: unknown,
+	requiredMessage: string,
+): string {
+	if (raw === undefined || raw === null) {
+		throw new NodeOperationError(context.getNode(), requiredMessage);
+	}
+	const id = String(raw).trim();
+	if (id === '') {
+		throw new NodeOperationError(context.getNode(), requiredMessage);
+	}
+	return id;
+}
+
 export async function executeGet(
 	context: IExecuteFunctions,
 	itemIndex: number,
@@ -19,12 +42,9 @@ export async function executeGet(
 	fieldsParameter?: string,
 	resourceName?: string,
 ): Promise<unknown> {
-	const id = context.getNodeParameter(idParameter, itemIndex) as string;
-	if (!id || id.trim() === '') {
-		const resource = resourceName || 'item';
-		const idLabel = resource === 'item' ? 'Item ID' : resource === 'user' ? 'User ID' : 'File ID';
-		throw new NodeOperationError(context.getNode(), `${idLabel} is required for get operation`);
-	}
+	const rawId = context.getNodeParameter(idParameter, itemIndex);
+	const label = idLabelForResource(resourceName);
+	const id = normalizeRequiredId(context, rawId, `${label} is required for get operation`);
 
 	const fields = fieldsParameter
 		? (context.getNodeParameter(fieldsParameter, itemIndex) as string[] | undefined)
@@ -76,8 +96,11 @@ export async function executeDelete(
 	makeRequest: MakeRequestFn,
 	resourcePath: string,
 	idParameter: string,
+	resourceName?: string,
 ): Promise<{ deleted: true; id: string }> {
-	const id = context.getNodeParameter(idParameter, itemIndex) as string;
+	const rawId = context.getNodeParameter(idParameter, itemIndex);
+	const label = idLabelForResource(resourceName);
+	const id = normalizeRequiredId(context, rawId, `${label} is required for delete operation`);
 	await makeRequest({
 		method: 'DELETE',
 		url: `${resourcePath}/${id}`,
@@ -107,8 +130,11 @@ export async function executeUpdate(
 	resourcePath: string,
 	idParameter: string,
 	fieldParameter: FieldParameter | undefined,
+	resourceName?: string,
 ): Promise<unknown> {
-	const id = context.getNodeParameter(idParameter, itemIndex) as string;
+	const rawId = context.getNodeParameter(idParameter, itemIndex);
+	const label = idLabelForResource(resourceName);
+	const id = normalizeRequiredId(context, rawId, `${label} is required for update operation`);
 	const body = buildRequestBody(fieldParameter);
 	return await makeRequest({
 		method: 'PATCH',

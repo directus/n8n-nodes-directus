@@ -4,6 +4,7 @@ import {
 	executeDelete,
 	executeGet,
 	executeGetAll,
+	normalizeRequiredId,
 	type MakeRequestFn,
 } from '../../methods/crud';
 import type { FieldParameter } from '../../types';
@@ -60,13 +61,11 @@ export async function executeFileOperations(
 
 		case 'import': {
 			// Import a file from a URL
-			const file = this.getNodeParameter('file', itemIndex) as string;
-			if (!file || file.trim() === '') {
-				throw new NodeOperationError(
-					this.getNode(),
-					'File URL is required for import. Provide a public URL in the File field.',
-				);
-			}
+			const file = normalizeRequiredId(
+				this,
+				this.getNodeParameter('file', itemIndex),
+				'File URL is required for import. Provide a public URL in the File field.',
+			);
 
 			const body: Record<string, unknown> = { url: file };
 
@@ -81,11 +80,15 @@ export async function executeFileOperations(
 			const fileFields = this.getNodeParameter('fileFields', itemIndex) as
 				| FieldParameter
 				| undefined;
-			return executeUpdate(this, itemIndex, makeRequest, resourcePath, 'fileId', fileFields);
+			return executeUpdate(this, itemIndex, makeRequest, resourcePath, 'fileId', fileFields, 'file');
 		}
 
 		case 'updateRaw': {
-			const fileId = this.getNodeParameter('fileId', itemIndex) as string;
+			const fileId = normalizeRequiredId(
+				this,
+				this.getNodeParameter('fileId', itemIndex),
+				'File ID is required for updateRaw operation',
+			);
 			const jsonData = this.getNodeParameter('jsonData', itemIndex);
 			const body = parseJsonData(this, jsonData) as Record<string, unknown>;
 			return await makeRequest({
@@ -96,7 +99,7 @@ export async function executeFileOperations(
 		}
 
 		case 'delete':
-			return executeDelete(this, itemIndex, makeRequest, resourcePath, 'fileId');
+			return executeDelete(this, itemIndex, makeRequest, resourcePath, 'fileId', 'file');
 
 		case 'get':
 			return executeGet(
@@ -110,10 +113,11 @@ export async function executeFileOperations(
 			);
 
 		case 'getRaw': {
-			const fileId = this.getNodeParameter('fileId', itemIndex) as string;
-			if (!fileId || fileId.trim() === '') {
-				throw new NodeOperationError(this.getNode(), 'File ID is required for getRaw operation');
-			}
+			const fileId = normalizeRequiredId(
+				this,
+				this.getNodeParameter('fileId', itemIndex),
+				'File ID is required for getRaw operation',
+			);
 			const queryParamsJson = this.getNodeParameter('queryParameters', itemIndex) as string;
 			let queryParams: IDataObject = {};
 			if (queryParamsJson) {
