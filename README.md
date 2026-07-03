@@ -75,10 +75,22 @@ npm install @directus/n8n-nodes-directus
 - **Smart Field Processing**: Handles complex field types and relationships
 - **Simplify Option**: Returns essential fields only for Users and Files "Get Many" operations
 - **Raw JSON Operations**: Full support for raw JSON data/query parameters for advanced use cases (available for all CRUD operations)
-- **Robust Error Handling**: Comprehensive error handling with detailed error messages
+- **Enriched Error Handling**: Includes item index, operation context, HTTP status, and Directus response details for faster debugging
 - **Webhook Management**: Automatic webhook creation and cleanup for trigger nodes
 - **Type Safety**: Full TypeScript support with proper type definitions
 - **UX Compliance**: Follows n8n community node UX guidelines with proper naming and placeholders
+
+### Error Output
+
+When a Directus request fails during node execution, the node now returns richer diagnostics:
+
+- Human-readable error message from Directus when available
+- HTTP status code and status message
+- Item index for the input item that failed
+- Resource/operation context (and collection for item operations)
+- Parsed Directus response body and error list (with sensitive keys redacted)
+
+This applies to both normal execution errors and the optional error output in `Continue On Fail` mode.
 
 ## Credentials
 

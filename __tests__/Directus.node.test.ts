@@ -13,7 +13,9 @@ vi.mock('../nodes/Directus/methods/fields', () => ({
 vi.mock('../nodes/Directus/methods/api', () => ({
 	getFieldsFromAPI: vi.fn(),
 	getRolesFromAPI: vi.fn(),
-	formatDirectusError: vi.fn((error: any) => error),
+	extractDirectusErrorDetails: vi.fn((error: any) => ({
+		message: error?.message || 'Unknown error',
+	})),
 }));
 
 describe('Directus Node', () => {
@@ -332,6 +334,108 @@ describe('Directus Node', () => {
 			const result = await node.execute.call(mockExecuteFunctions);
 
 			expect(result[0][0].json).toHaveProperty('error', 'API Error');
+			expect(result[0][0].json).toHaveProperty('errorDetails.itemIndex', 0);
+			expect(result[0][0].json).toHaveProperty('errorDetails.resource', 'item');
+			expect(result[0][0].json).toHaveProperty('errorDetails.operation', 'get');
+			expect(result[0][0].json).toHaveProperty('errorDetails.collection', 'users');
+		});
+
+		it('should include the failing item index in continueOnFail output during batch processing', async () => {
+			mockExecuteFunctions.getInputData.mockReturnValue([{ json: {} }, { json: {} }]);
+
+			mockExecuteFunctions.getNodeParameter.mockImplementation((parameter: string, index: number) => {
+				switch (parameter) {
+					case 'resource':
+						return 'item';
+					case 'operation':
+						return 'get';
+					case 'collection':
+						return 'users';
+					case 'itemId':
+						return index === 0 ? '1' : '2';
+					default:
+						return undefined;
+				}
+			});
+
+			mockExecuteFunctions.helpers.httpRequest
+				.mockResolvedValueOnce({ data: { id: 1, name: 'First item' } })
+				.mockRejectedValueOnce(new Error('Relationship creation failed'));
+
+			mockExecuteFunctions.continueOnFail.mockReturnValue(true);
+
+			const result = await node.execute.call(mockExecuteFunctions);
+
+			expect(result[0]).toHaveLength(2);
+			expect(result[0][0].json).toEqual({ id: 1, name: 'First item' });
+			expect(result[0][1].json).toHaveProperty('error', 'Relationship creation failed');
+			expect(result[0][1].json).toHaveProperty('errorDetails.itemIndex', 1);
+		});
+
+		it('should include structured Directus response details in continueOnFail output', async () => {
+			mockExecuteFunctions.getNodeParameter
+				.mockReturnValueOnce('item')
+				.mockReturnValueOnce('get')
+				.mockReturnValueOnce('tools')
+				.mockReturnValueOnce('1');
+
+			mockExecuteFunctions.continueOnFail.mockReturnValue(true);
+			mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(
+				new Error('Request failed with status code 400'),
+			);
+
+			vi.mocked(apiUtils.extractDirectusErrorDetails).mockReturnValue({
+				message:
+					'Request failed with status code 400: Invalid foreign key "199" for field "owner" in collection "tools".',
+				statusCode: 400,
+				statusMessage: 'Bad Request',
+				responseBody: {
+					errors: [
+						{
+							message:
+								'Invalid foreign key "199" for field "owner" in collection "tools".',
+							extensions: {
+								collection: 'tools',
+								field: 'owner',
+								value: 199,
+								code: 'INVALID_FOREIGN_KEY',
+							},
+						},
+					],
+				},
+				directusErrors: [
+					{
+						message:
+							'Invalid foreign key "199" for field "owner" in collection "tools".',
+						extensions: {
+							collection: 'tools',
+							field: 'owner',
+							value: 199,
+							code: 'INVALID_FOREIGN_KEY',
+						},
+					},
+				],
+				originalMessage: 'Request failed with status code 400',
+			});
+
+			const result = await node.execute.call(mockExecuteFunctions);
+
+			expect(result[0][0].json).toHaveProperty(
+				'error',
+				'Request failed with status code 400: Invalid foreign key "199" for field "owner" in collection "tools".',
+			);
+			expect(result[0][0].json).toHaveProperty('errorDetails.itemIndex', 0);
+			expect(result[0][0].json).toHaveProperty('errorDetails.collection', 'tools');
+			expect(result[0][0].json).toHaveProperty('errorDetails.statusCode', 400);
+			expect(result[0][0].json).toHaveProperty('errorDetails.statusMessage', 'Bad Request');
+			expect(result[0][0].json).toHaveProperty(
+				'errorDetails.responseBody.errors.0.extensions.code',
+				'INVALID_FOREIGN_KEY',
+			);
+			expect(result[0][0].json).toHaveProperty(
+				'errorDetails.directusErrors.0.extensions.field',
+				'owner',
+			);
 		});
 
 		it('should throw errors when continueOnFail is false', async () => {
@@ -344,9 +448,13 @@ describe('Directus Node', () => {
 			mockExecuteFunctions.continueOnFail.mockReturnValue(false);
 			const testError = new Error('API Error');
 			mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(testError);
-			vi.mocked(apiUtils.formatDirectusError).mockReturnValue(testError);
+			vi.mocked(apiUtils.extractDirectusErrorDetails).mockReturnValue({
+				message: 'API Error',
+				statusCode: 400,
+				responseBody: { errors: [{ message: 'Malformed query' }] },
+			});
 
-			await expect(node.execute.call(mockExecuteFunctions)).rejects.toThrow('API Error');
+			await expect(node.execute.call(mockExecuteFunctions)).rejects.toThrow('[Item 0] API Error');
 		});
 	});
 });
