@@ -1,4 +1,4 @@
-import { safeStringify } from './errorUtils';
+import { safeStringify, truncateText } from './errorUtils';
 import type { DirectusErrorDetails, DirectusExecutionErrorDetails } from '../types';
 
 interface BuildExecutionErrorContextParams {
@@ -44,11 +44,15 @@ export function buildExecutionErrorDescription(
 	}
 
 	if (errorDetails.responseBody !== undefined) {
-		descriptionLines.push(`Response body: ${safeStringify(errorDetails.responseBody)}`);
+		descriptionLines.push(
+			`Response body: ${truncateText(safeStringify(errorDetails.responseBody), 2000)}`,
+		);
 	}
 
 	if (errorDetails.directusErrors && errorDetails.directusErrors.length > 0) {
-		descriptionLines.push(`Directus errors: ${safeStringify(errorDetails.directusErrors)}`);
+		descriptionLines.push(
+			`Directus errors: ${truncateText(safeStringify(errorDetails.directusErrors), 2000)}`,
+		);
 	}
 
 	if (errorDetails.originalMessage && errorDetails.originalMessage !== errorDetails.message) {
