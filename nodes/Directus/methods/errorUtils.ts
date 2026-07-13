@@ -7,16 +7,30 @@ export function isObject(value: unknown): value is Record<string, unknown> {
 export function safeStringify(value: unknown): string {
 	const seen = new WeakSet<object>();
 
-	return JSON.stringify(value, (_key, currentValue) => {
-		if (isObject(currentValue)) {
-			if (seen.has(currentValue)) {
-				return '[Circular]';
+	try {
+		const result = JSON.stringify(value, (_key, currentValue) => {
+			if (typeof currentValue === 'bigint') {
+				return currentValue.toString();
 			}
-			seen.add(currentValue);
-		}
 
-		return currentValue;
-	});
+			if (isObject(currentValue)) {
+				if (seen.has(currentValue)) {
+					return '[Circular]';
+				}
+				seen.add(currentValue);
+			}
+
+			return currentValue;
+		});
+
+		return result ?? String(value);
+	} catch {
+		try {
+			return String(value);
+		} catch {
+			return '[Unserializable]';
+		}
+	}
 }
 
 export function truncateText(text: string, maxLength = DEFAULT_MAX_ERROR_PAYLOAD_LENGTH): string {
