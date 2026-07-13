@@ -9,7 +9,8 @@ import {
 	IDataObject,
 } from 'n8n-workflow';
 
-import { formatDirectusError } from './methods/api';
+import { extractDirectusErrorDetails } from './methods/api';
+import { buildExecutionErrorContext, buildExecutionErrorDescription } from './methods/errorContext';
 import { simplifyUser, simplifyFile } from './methods/simplify';
 import { createAuthenticatedRequest } from './methods/request';
 import type {
@@ -151,9 +152,13 @@ export class Directus implements INodeType {
 		const credentials = (await this.getCredentials('directusApi')) as DirectusCredentials;
 
 		for (let i = 0; i < items.length; i++) {
+			let resource = 'unknown';
+			let operation = 'unknown';
+			let collection: string | undefined;
+
 			try {
-				const resource = this.getNodeParameter('resource', i) as string;
-				const operation = this.getNodeParameter('operation', i) as string;
+				resource = this.getNodeParameter('resource', i) as string;
+				operation = this.getNodeParameter('operation', i) as string;
 
 				const getRequestOptions = createAuthenticatedRequest(credentials);
 				const makeRequest = async (
@@ -177,7 +182,7 @@ export class Directus implements INodeType {
 
 				// Dispatch to appropriate resource handler
 				if (resource === 'item') {
-					const collection = this.getNodeParameter('collection', i) as string;
+					collection = this.getNodeParameter('collection', i) as string;
 					responseData = await executeItemOperations.call(
 						this,
 						operation,
@@ -225,20 +230,30 @@ export class Directus implements INodeType {
 					returnData.push({ json: processedData as IDataObject, pairedItem: { item: i } });
 				}
 			} catch (error) {
+				const directusErrorDetails = extractDirectusErrorDetails(error);
+				const errorDetails = buildExecutionErrorContext({
+					itemIndex: i,
+					resource,
+					operation,
+					collection,
+					errorDetails: directusErrorDetails,
+				});
+
 				if (this.continueOnFail()) {
-					const errorMessage =
-						error instanceof Error
-							? error.message
-							: typeof error === 'object' && error !== null
-								? JSON.stringify(error)
-								: String(error);
 					returnData.push({
-						json: { error: errorMessage },
+						json: {
+							error: errorDetails.message,
+							errorDetails,
+						},
 						pairedItem: { item: i },
 					});
 				} else {
-					const formattedError = formatDirectusError(error);
-					throw new NodeOperationError(this.getNode(), formattedError.message);
+					const description = buildExecutionErrorDescription(errorDetails);
+
+					throw new NodeOperationError(this.getNode(), `[Item ${i}] ${errorDetails.message}`, {
+						itemIndex: i,
+						description,
+					});
 				}
 			}
 		}

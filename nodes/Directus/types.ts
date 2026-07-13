@@ -157,6 +157,22 @@ export interface DirectusHttpError {
 	errors?: Array<{ message?: string }>;
 }
 
+export interface DirectusErrorDetails {
+	message: string;
+	statusCode?: number;
+	statusMessage?: string;
+	responseBody?: unknown;
+	directusErrors?: Array<Record<string, unknown>>;
+	originalMessage?: string;
+}
+
+export interface DirectusExecutionErrorDetails extends DirectusErrorDetails {
+	itemIndex: number;
+	resource: string;
+	operation: string;
+	collection?: string;
+}
+
 // Type for helpers.request options (deprecated but needed for formData)
 export interface IRequestOptionsWithFormData {
 	method?: string;
