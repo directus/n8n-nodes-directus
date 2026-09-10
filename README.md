@@ -98,7 +98,7 @@ This project uses the official n8n-node CLI tool for development and follows n8n
 
 ### Prerequisites
 
-- **Node.js 22+**
+- **Node.js 22.16+** (required by current n8n for `npm run dev:n8n`; use [nvm](https://github.com/nvm-sh/nvm) if needed)
 - **npm 10+**
 - **Directus instance** for testing (cloud or self-hosted)
 - **ngrok** (for webhook testing) - install from [ngrok.com](https://ngrok.com/)
@@ -109,6 +109,10 @@ This project uses the official n8n-node CLI tool for development and follows n8n
 # Clone the repository
 git clone https://github.com/directus/n8n-nodes-directus.git
 cd n8n-nodes-directus
+
+# Use the Node version from .nvmrc (22.16+)
+nvm install
+nvm use
 
 # Install dependencies
 npm install
