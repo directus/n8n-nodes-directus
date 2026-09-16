@@ -42,6 +42,83 @@ export async function executeGet(
 	});
 }
 
+const RETURN_ALL_MAX_PAGES = 10_000;
+
+function unwrapListPayload(response: unknown): unknown[] | null {
+	const payload =
+		response !== null &&
+		typeof response === 'object' &&
+		'data' in response &&
+		(response as { data?: unknown }).data !== undefined
+			? (response as { data: unknown }).data
+			: response;
+	return Array.isArray(payload) ? payload : null;
+}
+
+function listQueryParams(
+	fields: string[] | undefined,
+	extra: Record<string, string | number> = {},
+): Record<string, string | number> | undefined {
+	const queryParams: Record<string, string | number> = { ...extra };
+	if (fields && fields.length > 0) {
+		queryParams.fields = fields.join(',');
+	}
+	return Object.keys(queryParams).length > 0 ? queryParams : undefined;
+}
+
+/**
+ * Fetch every page with offset pagination.
+ * Does not send `limit` (Directus applies min(QUERY_LIMIT_DEFAULT, QUERY_LIMIT_MAX))
+ * or `limit=-1` (unbounded when max is unset). Offset advances by the number of
+ * rows actually returned, so a lower QUERY_LIMIT_MAX cannot skip items.
+ */
+async function fetchAllPages(
+	context: IExecuteFunctions,
+	makeRequest: MakeRequestFn,
+	resourcePath: string,
+	fields: string[] | undefined,
+): Promise<{ data: unknown[] }> {
+	const allItems: unknown[] = [];
+	let offset = 0;
+	let expectedTotal: number | undefined;
+
+	for (let page = 0; page < RETURN_ALL_MAX_PAGES; page++) {
+		const response = await makeRequest({
+			method: 'GET',
+			url: resourcePath,
+			qs: listQueryParams(fields, {
+				offset,
+				meta: 'filter_count',
+			}),
+		});
+		const items = unwrapListPayload(response);
+
+		if (!items || items.length === 0) {
+			return { data: allItems };
+		}
+
+		allItems.push(...items);
+
+		if (expectedTotal === undefined) {
+			const filterCount = (response as { meta?: { filter_count?: unknown } })?.meta?.filter_count;
+			if (typeof filterCount === 'number') {
+				expectedTotal = filterCount;
+			}
+		}
+
+		if (expectedTotal !== undefined && allItems.length >= expectedTotal) {
+			return { data: allItems };
+		}
+
+		offset += items.length;
+	}
+
+	throw new NodeOperationError(
+		context.getNode(),
+		`Return All stopped after ${RETURN_ALL_MAX_PAGES} pages. Narrow the query or paginate with Get Many (Raw JSON).`,
+	);
+}
+
 export async function executeGetAll(
 	context: IExecuteFunctions,
 	itemIndex: number,
@@ -55,18 +132,14 @@ export async function executeGetAll(
 		? (context.getNodeParameter(fieldsParameter, itemIndex) as string[] | undefined)
 		: undefined;
 
-	const queryParams: Record<string, string | number> = {};
-	if (!returnAll) {
-		queryParams.limit = limit;
-	}
-	if (fields && fields.length > 0) {
-		queryParams.fields = fields.join(',');
+	if (returnAll) {
+		return await fetchAllPages(context, makeRequest, resourcePath, fields);
 	}
 
 	return await makeRequest({
 		method: 'GET',
 		url: resourcePath,
-		qs: Object.keys(queryParams).length > 0 ? queryParams : undefined,
+		qs: listQueryParams(fields, { limit }),
 	});
 }
 
