@@ -197,9 +197,7 @@ For testing the **Directus Trigger** node, you need to expose n8n via a public U
 
 ## Contributing
 
-We welcome feedback and suggestions! Please help us improve this community node:
-
-Maintainers may also refer to [docs/maintainer-notes.md](docs/maintainer-notes.md) for lockfile refreshes, closing superseded Dependabot PRs, and notes on expression-based credential fields.
+We welcome feedback and suggestions!
 
 ### Reporting Issues
 
