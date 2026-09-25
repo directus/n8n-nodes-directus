@@ -4,7 +4,7 @@ import {
 	executeDelete,
 	executeGet,
 	executeGetAll,
-	normalizeRequiredId,
+	normalizeRequiredString,
 	type MakeRequestFn,
 } from '../../methods/crud';
 import type { FieldParameter } from '../../types';
@@ -61,7 +61,7 @@ export async function executeFileOperations(
 
 		case 'import': {
 			// Import a file from a URL
-			const file = normalizeRequiredId(
+			const file = normalizeRequiredString(
 				this,
 				this.getNodeParameter('file', itemIndex),
 				'File URL is required for import. Provide a public URL in the File field.',
@@ -80,11 +80,19 @@ export async function executeFileOperations(
 			const fileFields = this.getNodeParameter('fileFields', itemIndex) as
 				| FieldParameter
 				| undefined;
-			return executeUpdate(this, itemIndex, makeRequest, resourcePath, 'fileId', fileFields, 'file');
+			return executeUpdate(
+				this,
+				itemIndex,
+				makeRequest,
+				resourcePath,
+				'fileId',
+				fileFields,
+				'file',
+			);
 		}
 
 		case 'updateRaw': {
-			const fileId = normalizeRequiredId(
+			const fileId = normalizeRequiredString(
 				this,
 				this.getNodeParameter('fileId', itemIndex),
 				'File ID is required for updateRaw operation',
@@ -113,7 +121,7 @@ export async function executeFileOperations(
 			);
 
 		case 'getRaw': {
-			const fileId = normalizeRequiredId(
+			const fileId = normalizeRequiredString(
 				this,
 				this.getNodeParameter('fileId', itemIndex),
 				'File ID is required for getRaw operation',

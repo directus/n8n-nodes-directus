@@ -5,7 +5,7 @@ import {
 	executeDelete,
 	executeGet,
 	executeGetAll,
-	normalizeRequiredId,
+	normalizeRequiredString,
 	type MakeRequestFn,
 } from '../../methods/crud';
 import type { FieldParameter } from '../../types';
@@ -54,7 +54,7 @@ export async function executeItemOperations(
 		}
 
 		case 'updateRaw': {
-			const itemId = normalizeRequiredId(
+			const itemId = normalizeRequiredString(
 				this,
 				this.getNodeParameter('itemId', itemIndex),
 				'Item ID is required for updateRaw operation',
@@ -75,7 +75,7 @@ export async function executeItemOperations(
 			return executeGet(this, itemIndex, makeRequest, resourcePath, 'itemId', 'itemFields', 'item');
 
 		case 'getRaw': {
-			const itemId = normalizeRequiredId(
+			const itemId = normalizeRequiredString(
 				this,
 				this.getNodeParameter('itemId', itemIndex),
 				'Item ID is required for getRaw operation',

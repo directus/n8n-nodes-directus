@@ -17,8 +17,8 @@ function idLabelForResource(resourceName?: string): string {
 	return 'File ID';
 }
 
-/** Coerce n8n parameter values (string | number | etc.) to a non-empty ID string for URL segments. */
-export function normalizeRequiredId(
+/** Coerce n8n parameter values (string | number | etc.) to a non-empty trimmed string. */
+export function normalizeRequiredString(
 	context: IExecuteFunctions,
 	raw: unknown,
 	requiredMessage: string,
@@ -44,7 +44,7 @@ export async function executeGet(
 ): Promise<unknown> {
 	const rawId = context.getNodeParameter(idParameter, itemIndex);
 	const label = idLabelForResource(resourceName);
-	const id = normalizeRequiredId(context, rawId, `${label} is required for get operation`);
+	const id = normalizeRequiredString(context, rawId, `${label} is required for get operation`);
 
 	const fields = fieldsParameter
 		? (context.getNodeParameter(fieldsParameter, itemIndex) as string[] | undefined)
@@ -100,7 +100,7 @@ export async function executeDelete(
 ): Promise<{ deleted: true; id: string }> {
 	const rawId = context.getNodeParameter(idParameter, itemIndex);
 	const label = idLabelForResource(resourceName);
-	const id = normalizeRequiredId(context, rawId, `${label} is required for delete operation`);
+	const id = normalizeRequiredString(context, rawId, `${label} is required for delete operation`);
 	await makeRequest({
 		method: 'DELETE',
 		url: `${resourcePath}/${id}`,
@@ -134,7 +134,7 @@ export async function executeUpdate(
 ): Promise<unknown> {
 	const rawId = context.getNodeParameter(idParameter, itemIndex);
 	const label = idLabelForResource(resourceName);
-	const id = normalizeRequiredId(context, rawId, `${label} is required for update operation`);
+	const id = normalizeRequiredString(context, rawId, `${label} is required for update operation`);
 	const body = buildRequestBody(fieldParameter);
 	return await makeRequest({
 		method: 'PATCH',

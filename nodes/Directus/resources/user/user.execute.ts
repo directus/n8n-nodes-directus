@@ -4,7 +4,7 @@ import {
 	executeDelete,
 	executeGet,
 	executeGetAll,
-	normalizeRequiredId,
+	normalizeRequiredString,
 	type MakeRequestFn,
 } from '../../methods/crud';
 import type { FieldParameter } from '../../types';
@@ -51,11 +51,19 @@ export async function executeUserOperations(
 			const userFields = this.getNodeParameter('userFields', itemIndex) as
 				| FieldParameter
 				| undefined;
-			return executeUpdate(this, itemIndex, makeRequest, resourcePath, 'userId', userFields, 'user');
+			return executeUpdate(
+				this,
+				itemIndex,
+				makeRequest,
+				resourcePath,
+				'userId',
+				userFields,
+				'user',
+			);
 		}
 
 		case 'updateRaw': {
-			const userId = normalizeRequiredId(
+			const userId = normalizeRequiredString(
 				this,
 				this.getNodeParameter('userId', itemIndex),
 				'User ID is required for updateRaw operation',
@@ -84,7 +92,7 @@ export async function executeUserOperations(
 			);
 
 		case 'getRaw': {
-			const userId = normalizeRequiredId(
+			const userId = normalizeRequiredString(
 				this,
 				this.getNodeParameter('userId', itemIndex),
 				'User ID is required for getRaw operation',
