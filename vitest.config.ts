@@ -6,11 +6,6 @@ export default defineConfig({
 		globals: true,
 		environment: 'node',
 		pool: 'threads',
-		poolOptions: {
-			threads: {
-				singleThread: true,
-			},
-		},
 		setupFiles: ['./__tests__/setup.ts'],
 		include: ['__tests__/**/*.test.ts'],
 		coverage: {

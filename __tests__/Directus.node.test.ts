@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { NodeOperationError } from 'n8n-workflow';
 import { Directus } from '../nodes/Directus/Directus.node';
 import { createMockExecuteFunctions } from './helpers';
 import * as fieldsUtils from '../nodes/Directus/methods/fields';
@@ -122,6 +123,51 @@ describe('Directus Node', () => {
 			expect(result[0][0].json).toEqual({ id: 1, name: 'Test' });
 		});
 
+		it('should get item when item ID is a number (expressions)', async () => {
+			mockExecuteFunctions.getNodeParameter
+				.mockReturnValueOnce('item')
+				.mockReturnValueOnce('get')
+				.mockReturnValueOnce('users')
+				.mockReturnValueOnce(42);
+
+			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue({
+				data: { id: 42, name: 'Numeric' },
+			});
+
+			await node.execute.call(mockExecuteFunctions);
+
+			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith(
+				expect.objectContaining({
+					method: 'GET',
+					url: '/items/users/42',
+				}),
+			);
+		});
+
+		it('should throw when item ID is missing for get', async () => {
+			mockExecuteFunctions.getNodeParameter
+				.mockReturnValueOnce('item')
+				.mockReturnValueOnce('get')
+				.mockReturnValueOnce('users')
+				.mockReturnValueOnce('');
+
+			await expect(node.execute.call(mockExecuteFunctions)).rejects.toBeInstanceOf(
+				NodeOperationError,
+			);
+		});
+
+		it('should throw when item ID is whitespace-only for get', async () => {
+			mockExecuteFunctions.getNodeParameter
+				.mockReturnValueOnce('item')
+				.mockReturnValueOnce('get')
+				.mockReturnValueOnce('users')
+				.mockReturnValueOnce('   ');
+
+			await expect(node.execute.call(mockExecuteFunctions)).rejects.toBeInstanceOf(
+				NodeOperationError,
+			);
+		});
+
 		it('should update item', async () => {
 			mockExecuteFunctions.getNodeParameter
 				.mockReturnValueOnce('item')
@@ -151,6 +197,39 @@ describe('Directus Node', () => {
 			const result = await node.execute.call(mockExecuteFunctions);
 
 			expect(result[0][0].json).toEqual({ deleted: true, id: '1' });
+		});
+
+		it('should delete item when item ID is a number', async () => {
+			mockExecuteFunctions.getNodeParameter
+				.mockReturnValueOnce('item')
+				.mockReturnValueOnce('delete')
+				.mockReturnValueOnce('users')
+				.mockReturnValueOnce(99);
+
+			mockExecuteFunctions.helpers.httpRequest.mockResolvedValue({});
+
+			const result = await node.execute.call(mockExecuteFunctions);
+
+			expect(result[0][0].json).toEqual({ deleted: true, id: '99' });
+			expect(mockExecuteFunctions.helpers.httpRequest).toHaveBeenCalledWith(
+				expect.objectContaining({
+					method: 'DELETE',
+					url: '/items/users/99',
+				}),
+			);
+		});
+
+		it('should throw when item ID is missing for update', async () => {
+			mockExecuteFunctions.getNodeParameter
+				.mockReturnValueOnce('item')
+				.mockReturnValueOnce('update')
+				.mockReturnValueOnce('users')
+				.mockReturnValueOnce({ fields: { field: [] } })
+				.mockReturnValueOnce('');
+
+			await expect(node.execute.call(mockExecuteFunctions)).rejects.toBeInstanceOf(
+				NodeOperationError,
+			);
 		});
 
 		describe('User Operations', () => {
