@@ -1,4 +1,4 @@
-import type { ILoadOptionsFunctions } from 'n8n-workflow';
+import { NodeOperationError, type ILoadOptionsFunctions } from 'n8n-workflow';
 import { getCollectionsFromAPI, getFieldsFromAPI, getRelationsFromAPI } from './api';
 import { formatFieldName } from './utils';
 import type {
@@ -174,7 +174,8 @@ async function getFields(
 		return fields;
 	} catch (error) {
 		const formattedError = error instanceof Error ? error : new Error(String(error));
-		throw new Error(
+		throw new NodeOperationError(
+			functions.getNode(),
 			`Failed to fetch fields for collection '${collection}': ${formattedError.message}`,
 		);
 	}
@@ -191,7 +192,10 @@ export async function getCollections(
 		});
 	} catch (error) {
 		const formattedError = error instanceof Error ? error : new Error(String(error));
-		throw new Error(`Failed to fetch collections: ${formattedError.message}`);
+		throw new NodeOperationError(
+			functions.getNode(),
+			`Failed to fetch collections: ${formattedError.message}`,
+		);
 	}
 }
 

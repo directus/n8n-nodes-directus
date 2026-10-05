@@ -33,24 +33,26 @@ export async function handleWebhook(this: IWebhookFunctions): Promise<IWebhookRe
 
 	// For update events, fetch the full updated record from Directus
 	// (Directus webhooks only send partial data for updates)
-	if (event === 'update' && entityId) {
+	// Bulk updates share one partial payload across keys, so a single record would misrepresent them
+	const isBulkUpdate = (payload.keys?.length ?? 0) > 1;
+	if (event === 'update' && entityId && !isBulkUpdate) {
 		const credentials = (await this.getCredentials('directusApi')) as DirectusCredentials;
 		const collection = resource === 'item' ? payload.collection || 'unknown' : undefined;
 		const directusApiEndpoint =
 			resource === 'item' ? `/items/${collection}/${entityId}` : `/${resource}s/${entityId}`;
+		const baseUrl = credentials.url.replace(/\/+$/, '');
+		const fullUrl = `${baseUrl}${directusApiEndpoint}`;
 
 		try {
-			const response = await this.helpers.httpRequest({
+			const response = await this.helpers.httpRequestWithAuthentication.call(this, 'directusApi', {
 				method: 'GET',
-				url: directusApiEndpoint,
-				baseURL: credentials.url,
+				url: fullUrl,
 				headers: {
-					Authorization: `Bearer ${credentials.token}`,
 					Accept: 'application/json',
 				},
 			});
 
-			const fetchedData = (response as { data?: { data?: unknown } })?.data?.data;
+			const fetchedData = (response as { data?: unknown })?.data;
 			if (fetchedData && typeof fetchedData === 'object' && !Array.isArray(fetchedData)) {
 				completeData = fetchedData as Record<string, unknown>;
 				// Re-extract ID from fetched data

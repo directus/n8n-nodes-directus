@@ -1,8 +1,10 @@
 import {
+	IHookFunctions,
 	IWebhookFunctions,
 	INodeType,
 	INodeTypeDescription,
 	IWebhookResponseData,
+	NodeConnectionTypes,
 } from 'n8n-workflow';
 
 import { checkExists, create, deleteWebhook } from './methods/webhookMethods';
@@ -23,7 +25,7 @@ export class DirectusTrigger implements INodeType {
 			name: 'Directus Trigger',
 		},
 		inputs: [],
-		outputs: ['main'],
+		outputs: [NodeConnectionTypes.Main],
 		credentials: [
 			{
 				name: 'directusApi',
@@ -46,16 +48,16 @@ export class DirectusTrigger implements INodeType {
 				noDataExpression: true,
 				options: [
 					{
+						name: 'File',
+						value: 'file',
+					},
+					{
 						name: 'Item',
 						value: 'item',
 					},
 					{
 						name: 'User',
 						value: 'user',
-					},
-					{
-						name: 'File',
-						value: 'file',
 					},
 				],
 				default: 'item',
@@ -92,12 +94,12 @@ export class DirectusTrigger implements INodeType {
 						value: 'create',
 					},
 					{
-						name: 'Updated',
-						value: 'update',
-					},
-					{
 						name: 'Deleted',
 						value: 'delete',
+					},
+					{
+						name: 'Updated',
+						value: 'update',
 					},
 				],
 				default: 'create',
@@ -127,9 +129,15 @@ export class DirectusTrigger implements INodeType {
 
 	webhookMethods = {
 		default: {
-			checkExists,
-			create,
-			delete: deleteWebhook,
+			async checkExists(this: IHookFunctions): Promise<boolean> {
+				return checkExists.call(this);
+			},
+			async create(this: IHookFunctions): Promise<boolean> {
+				return create.call(this);
+			},
+			async delete(this: IHookFunctions): Promise<boolean> {
+				return deleteWebhook.call(this);
+			},
 		},
 	};
 

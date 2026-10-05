@@ -66,16 +66,16 @@ export class Directus implements INodeType {
 				noDataExpression: true,
 				options: [
 					{
+						name: 'File',
+						value: 'file',
+					},
+					{
 						name: 'Item',
 						value: 'item',
 					},
 					{
 						name: 'User',
 						value: 'user',
-					},
-					{
-						name: 'File',
-						value: 'file',
 					},
 				],
 				default: 'item',

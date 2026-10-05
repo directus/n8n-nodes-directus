@@ -119,14 +119,67 @@ describe('DirectusTrigger Node', () => {
 			mockWebhookFunctions.getNodeParameter
 				.mockReturnValueOnce('user')
 				.mockReturnValueOnce('update');
-			mockWebhookFunctions.helpers.httpRequest.mockResolvedValue({
-				data: { data: { id: 1, email: 'test@example.com' } },
+			mockWebhookFunctions.helpers.httpRequestWithAuthentication.mockResolvedValue({
+				data: { id: 1, email: 'test@example.com' },
 			});
 
 			const result = await node.webhook.call(mockWebhookFunctions);
 
 			expect(result.workflowData![0][0].json.event).toBe('users.update');
 			expect(result.workflowData![0][0].json.id).toBe('1');
+			expect(mockWebhookFunctions.helpers.httpRequestWithAuthentication).toHaveBeenCalledWith(
+				'directusApi',
+				expect.objectContaining({ method: 'GET', url: 'https://test.directus.app/users/1' }),
+			);
+		});
+
+		it('should replace partial update payload with the fetched item', async () => {
+			mockWebhookFunctions.getCredentials.mockResolvedValue({
+				url: 'https://test.directus.app/',
+				token: 'test-token',
+			});
+			mockWebhookFunctions.getBodyData.mockReturnValue({
+				event: 'items.update',
+				collection: 'posts',
+				payload: { title: 'New title' },
+				keys: ['7'],
+			});
+			mockWebhookFunctions.getNodeParameter
+				.mockReturnValueOnce('item')
+				.mockReturnValueOnce('update');
+			mockWebhookFunctions.helpers.httpRequestWithAuthentication.mockResolvedValue({
+				data: { id: 7, title: 'New title', status: 'published' },
+			});
+
+			const result = await node.webhook.call(mockWebhookFunctions);
+
+			expect(mockWebhookFunctions.helpers.httpRequestWithAuthentication).toHaveBeenCalledWith(
+				'directusApi',
+				expect.objectContaining({ url: 'https://test.directus.app/items/posts/7' }),
+			);
+			expect(result.workflowData![0][0].json.payload).toEqual({
+				id: 7,
+				title: 'New title',
+				status: 'published',
+			});
+		});
+
+		it('should keep the partial payload for bulk updates', async () => {
+			mockWebhookFunctions.getBodyData.mockReturnValue({
+				event: 'items.update',
+				collection: 'posts',
+				payload: { status: 'archived' },
+				keys: ['1', '2', '3'],
+			});
+			mockWebhookFunctions.getNodeParameter
+				.mockReturnValueOnce('item')
+				.mockReturnValueOnce('update');
+
+			const result = await node.webhook.call(mockWebhookFunctions);
+
+			expect(mockWebhookFunctions.helpers.httpRequestWithAuthentication).not.toHaveBeenCalled();
+			expect(result.workflowData![0][0].json.payload).toEqual({ status: 'archived' });
+			expect(result.workflowData![0][0].json.keys).toEqual(['1', '2', '3']);
 		});
 
 		it('should process file webhook', async () => {
@@ -158,8 +211,8 @@ describe('DirectusTrigger Node', () => {
 			mockWebhookFunctions.getNodeParameter
 				.mockReturnValueOnce('user')
 				.mockReturnValueOnce('update');
-			mockWebhookFunctions.helpers.httpRequest.mockResolvedValue({
-				data: { data: { id: 'user-uuid-123', email: 'test@example.com' } },
+			mockWebhookFunctions.helpers.httpRequestWithAuthentication.mockResolvedValue({
+				data: { id: 'user-uuid-123', email: 'test@example.com' },
 			});
 
 			const result = await node.webhook.call(mockWebhookFunctions);

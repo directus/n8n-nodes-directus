@@ -26,9 +26,6 @@ npm install @directus/n8n-nodes-directus
 
    ```bash
    npm install @directus/n8n-nodes-directus
-
-   # Or using pnpm
-   pnpm add @directus/n8n-nodes-directus
    ```
 
 2. **Configure credentials** in n8n:
@@ -101,7 +98,7 @@ This project uses the official n8n-node CLI tool for development and follows n8n
 
 ### Prerequisites
 
-- **Node.js 22+**
+- **Node.js 22.16+** (required by current n8n for `npm run dev:n8n`; use [nvm](https://github.com/nvm-sh/nvm) if needed)
 - **npm 10+**
 - **Directus instance** for testing (cloud or self-hosted)
 - **ngrok** (for webhook testing) - install from [ngrok.com](https://ngrok.com/)
@@ -112,6 +109,10 @@ This project uses the official n8n-node CLI tool for development and follows n8n
 # Clone the repository
 git clone https://github.com/directus/n8n-nodes-directus.git
 cd n8n-nodes-directus
+
+# Use the Node version from .nvmrc (22.16+)
+nvm install
+nvm use
 
 # Install dependencies
 npm install
@@ -191,12 +192,12 @@ For testing the **Directus Trigger** node, you need to expose n8n via a public U
 ### Getting Help
 
 - Check the [GitHub Issues](https://github.com/directus/n8n-nodes-directus/issues) for known problems
-- Run `pnpm test` to verify everything works
-- Use `pnpm test:coverage` to see test coverage
+- Run `npm test` to verify everything works
+- Use `npm run test:coverage` to see test coverage
 
 ## Contributing
 
-We welcome feedback and suggestions! Please help us improve this community node:
+We welcome feedback and suggestions!
 
 ### Reporting Issues
 
