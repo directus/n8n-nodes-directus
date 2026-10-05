@@ -66,13 +66,13 @@
 	"overrides": {
 		"@humanfs/node": "^0.16.8",
 		"axios": "^1.20.0",
-		"brace-expansion": "^2.1.4",
+		"brace-expansion@2": "^2.1.7",
 		"form-data": "^4.0.6",
 		"js-yaml": "^4.3.2",
-		"minimatch": "^9.0.7",
+		"minimatch@9": "^9.0.7",
 		"tmp": "^0.2.7",
 		"undici": "^6.28.1",
-		"uuid": "^11.1.1",
+		"uuid@<11.1.1": "^11.1.1",
 		"vite": "^8.3.0",
 		"ws": "^8.21.3"
 	}
