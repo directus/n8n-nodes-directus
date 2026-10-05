@@ -144,17 +144,19 @@ export interface DirectusFile {
 }
 
 export interface DirectusHttpError {
+	isAxiosError?: boolean;
 	statusCode?: number;
-	status?: number;
 	response?: {
-		statusCode?: number;
 		status?: number;
-		statusMessage?: string;
 		data?: unknown;
 		body?: unknown;
 	};
+	error?: unknown;
 	message?: string;
-	errors?: Array<{ message?: string }>;
+}
+
+export interface DirectusErrorBody {
+	errors?: Array<{ message?: unknown; extensions?: { code?: unknown } } | null>;
 }
 
 // Type for helpers.request options (deprecated but needed for formData)

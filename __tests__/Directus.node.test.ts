@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { NodeOperationError } from 'n8n-workflow';
+import { NodeApiError, NodeOperationError } from 'n8n-workflow';
 import { Directus } from '../nodes/Directus/Directus.node';
 import { createMockExecuteFunctions } from './helpers';
 import * as fieldsUtils from '../nodes/Directus/methods/fields';
@@ -8,14 +8,26 @@ import * as apiUtils from '../nodes/Directus/methods/api';
 vi.mock('../nodes/Directus/methods/fields', () => ({
 	getCollections: vi.fn(),
 	convertCollectionFieldsToN8n: vi.fn(),
-	formatDirectusError: vi.fn((error: any) => error.message || 'Unknown error'),
 }));
 
-vi.mock('../nodes/Directus/methods/api', () => ({
+vi.mock('../nodes/Directus/methods/api', async (importOriginal) => ({
+	...(await importOriginal<typeof import('../nodes/Directus/methods/api')>()),
 	getFieldsFromAPI: vi.fn(),
 	getRolesFromAPI: vi.fn(),
-	formatDirectusError: vi.fn((error: any) => error),
 }));
+
+function directusError(status: number, message: string, code: string) {
+	return Object.assign(new Error(`Request failed with status code ${status}`), {
+		isAxiosError: true,
+		status,
+		response: {
+			status,
+			statusText: 'Bad Request',
+			headers: {},
+			data: { errors: [{ message, extensions: { code } }] },
+		},
+	});
+}
 
 describe('Directus Node', () => {
 	let node: Directus;
@@ -421,11 +433,156 @@ describe('Directus Node', () => {
 				.mockReturnValueOnce('1');
 
 			mockExecuteFunctions.continueOnFail.mockReturnValue(false);
-			const testError = new Error('API Error');
-			mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(testError);
-			vi.mocked(apiUtils.formatDirectusError).mockReturnValue(testError);
+			mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(new Error('API Error'));
 
 			await expect(node.execute.call(mockExecuteFunctions)).rejects.toThrow('API Error');
+		});
+
+		it('should throw the Directus message with status, code, and item index', async () => {
+			mockExecuteFunctions.getNodeParameter
+				.mockReturnValueOnce('item')
+				.mockReturnValueOnce('get')
+				.mockReturnValueOnce('posts')
+				.mockReturnValueOnce('1');
+
+			mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(
+				directusError(403, "You don't have permission to access this.", 'FORBIDDEN'),
+			);
+
+			const error = await node.execute.call(mockExecuteFunctions).catch((e: unknown) => e);
+
+			expect(error).toBeInstanceOf(NodeApiError);
+			expect(error).toMatchObject({
+				message: "You don't have permission to access this.",
+				description: 'Directus error code: FORBIDDEN',
+				httpCode: '403',
+				context: expect.objectContaining({ itemIndex: 0 }),
+			});
+		});
+
+		it('should report the index of the item that failed', async () => {
+			mockExecuteFunctions.getInputData.mockReturnValue([{ json: {} }, { json: {} }, { json: {} }]);
+			mockExecuteFunctions.getNodeParameter.mockImplementation((name: string) => {
+				const params: Record<string, string> = {
+					resource: 'item',
+					operation: 'get',
+					collection: 'posts',
+					itemId: '1',
+				};
+				return params[name];
+			});
+			mockExecuteFunctions.helpers.httpRequest
+				.mockResolvedValueOnce({ data: { id: 1 } })
+				.mockResolvedValueOnce({ data: { id: 2 } })
+				.mockRejectedValueOnce(directusError(400, 'Invalid query.', 'INVALID_QUERY'));
+
+			const error = await node.execute.call(mockExecuteFunctions).catch((e: unknown) => e);
+
+			expect(error).toBeInstanceOf(NodeApiError);
+			expect((error as NodeApiError).context.itemIndex).toBe(2);
+			expect((error as NodeApiError).message).not.toMatch(/\[item/i);
+		});
+
+		it('should keep validation errors as NodeOperationError with the item index', async () => {
+			mockExecuteFunctions.getNodeParameter
+				.mockReturnValueOnce('item')
+				.mockReturnValueOnce('get')
+				.mockReturnValueOnce('posts')
+				.mockReturnValueOnce('');
+
+			const error = await node.execute.call(mockExecuteFunctions).catch((e: unknown) => e);
+
+			expect(error).toBeInstanceOf(NodeOperationError);
+			expect(error).not.toBeInstanceOf(NodeApiError);
+			expect(error).toMatchObject({
+				message: 'Item ID is required for get operation',
+				context: expect.objectContaining({ itemIndex: 0 }),
+			});
+		});
+
+		it('should output Directus error details per item with continueOnFail', async () => {
+			mockExecuteFunctions.continueOnFail.mockReturnValue(true);
+			mockExecuteFunctions.getInputData.mockReturnValue([{ json: {} }, { json: {} }]);
+			mockExecuteFunctions.getNodeParameter.mockImplementation((name: string) => {
+				const params: Record<string, unknown> = {
+					resource: 'item',
+					operation: 'create',
+					collection: 'posts',
+					collectionFields: { fields: { field: [{ name: 'title', value: 'Hello' }] } },
+				};
+				return params[name];
+			});
+			mockExecuteFunctions.helpers.httpRequest
+				.mockResolvedValueOnce({ data: { id: 1, title: 'Hello' } })
+				.mockRejectedValueOnce(
+					directusError(
+						400,
+						'Value for field "title" in collection "posts" has to be unique.',
+						'RECORD_NOT_UNIQUE',
+					),
+				);
+
+			const result = await node.execute.call(mockExecuteFunctions);
+
+			expect(result[0]).toEqual([
+				{ json: { id: 1, title: 'Hello' }, pairedItem: { item: 0 } },
+				{
+					json: {
+						error: 'Value for field "title" in collection "posts" has to be unique.',
+						httpCode: '400',
+						code: 'RECORD_NOT_UNIQUE',
+					},
+					pairedItem: { item: 1 },
+				},
+			]);
+		});
+
+		it('should output only the message for non-HTTP errors with continueOnFail', async () => {
+			mockExecuteFunctions.continueOnFail.mockReturnValue(true);
+			mockExecuteFunctions.getNodeParameter
+				.mockReturnValueOnce('item')
+				.mockReturnValueOnce('get')
+				.mockReturnValueOnce('posts')
+				.mockReturnValueOnce('');
+
+			const result = await node.execute.call(mockExecuteFunctions);
+
+			expect(result[0][0].json).toEqual({ error: 'Item ID is required for get operation' });
+		});
+
+		it('should surface the Directus message for file uploads (legacy request helper)', async () => {
+			mockExecuteFunctions.getInputData.mockReturnValue([
+				{
+					json: {},
+					binary: { data: { data: '', mimeType: 'text/plain', fileName: 'test.txt' } },
+				},
+			]);
+			mockExecuteFunctions.getNodeParameter
+				.mockReturnValueOnce('file')
+				.mockReturnValueOnce('upload');
+			const body = {
+				errors: [
+					{ message: 'File exceeds the maximum size.', extensions: { code: 'CONTENT_TOO_LARGE' } },
+				],
+			};
+			mockExecuteFunctions.helpers.request.mockRejectedValue(
+				Object.assign(new Error(`413 - ${JSON.stringify(body)}`), {
+					statusCode: 413,
+					status: 413,
+					error: body,
+					response: { headers: {}, status: 413, statusText: 'Payload Too Large' },
+				}),
+			);
+
+			const error = await node.execute.call(mockExecuteFunctions).catch((e: unknown) => e);
+
+			expect(mockExecuteFunctions.helpers.request).toHaveBeenCalled();
+			expect(error).toBeInstanceOf(NodeApiError);
+			expect(error).toMatchObject({
+				message: 'File exceeds the maximum size.',
+				description: 'Directus error code: CONTENT_TOO_LARGE',
+				httpCode: '413',
+			});
 		});
 	});
 });

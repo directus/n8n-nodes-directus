@@ -3,13 +3,14 @@ import {
 	INodeExecutionData,
 	INodeType,
 	INodeTypeDescription,
+	NodeApiError,
 	NodeConnectionTypes,
 	NodeOperationError,
 	IHttpRequestOptions,
 	IDataObject,
 } from 'n8n-workflow';
 
-import { formatDirectusError } from './methods/api';
+import { readDirectusErrors, toNodeError } from './methods/api';
 import { simplifyUser, simplifyFile } from './methods/simplify';
 import { createAuthenticatedRequest } from './methods/request';
 import type {
@@ -225,21 +226,22 @@ export class Directus implements INodeType {
 					returnData.push({ json: processedData as IDataObject, pairedItem: { item: i } });
 				}
 			} catch (error) {
-				if (this.continueOnFail()) {
-					const errorMessage =
-						error instanceof Error
-							? error.message
-							: typeof error === 'object' && error !== null
-								? JSON.stringify(error)
-								: String(error);
-					returnData.push({
-						json: { error: errorMessage },
-						pairedItem: { item: i },
-					});
-				} else {
-					const formattedError = formatDirectusError(error);
-					throw new NodeOperationError(this.getNode(), formattedError.message);
+				const nodeError = toNodeError(this.getNode(), error, i);
+				if (!this.continueOnFail()) {
+					throw nodeError;
 				}
+
+				const { code } = readDirectusErrors(error);
+				returnData.push({
+					json: {
+						error: nodeError.message,
+						...(nodeError instanceof NodeApiError && nodeError.httpCode
+							? { httpCode: nodeError.httpCode }
+							: {}),
+						...(code ? { code } : {}),
+					},
+					pairedItem: { item: i },
+				});
 			}
 		}
 

@@ -1,4 +1,10 @@
-import type { ILoadOptionsFunctions } from 'n8n-workflow';
+import {
+	NodeApiError,
+	NodeOperationError,
+	type ILoadOptionsFunctions,
+	type INode,
+	type JsonObject,
+} from 'n8n-workflow';
 import type {
 	DirectusCredentials,
 	DirectusRelation,
@@ -6,6 +12,7 @@ import type {
 	DirectusField,
 	DirectusRole,
 	DirectusApiResponse,
+	DirectusErrorBody,
 	DirectusHttpError,
 } from '../types';
 import { createAuthenticatedRequest } from './request';
@@ -46,79 +53,88 @@ async function fetchFromDirectus<T>(
 
 		return responseData;
 	} catch (error) {
-		throw formatDirectusError(error);
+		throw toNodeError(functions.getNode(), error);
+	}
+}
+
+function getResponseBody(error: DirectusHttpError): unknown {
+	// httpRequest (axios) keeps the body on response.data; the legacy helpers.request puts it on error.error
+	const body = error.response?.data ?? error.response?.body ?? error.error;
+	if (typeof body !== 'string') {
+		return body;
+	}
+	try {
+		return JSON.parse(body);
+	} catch {
+		return body;
 	}
 }
 
 /**
- * Formats Directus API errors into user-friendly messages
+ * Pulls the human-readable messages and error codes out of a Directus `{ errors: [...] }` body
  */
-export function formatDirectusError(error: unknown): Error {
-	if (error instanceof Error) {
+export function readDirectusErrors(error: unknown): { message?: string; code?: string } {
+	if (typeof error !== 'object' || error === null) {
+		return {};
+	}
+
+	const body = getResponseBody(error as DirectusHttpError) as DirectusErrorBody | undefined;
+	const errors = Array.isArray(body?.errors) ? body.errors : [];
+	const messages = errors.map((entry) => entry?.message).filter(isNonEmptyString);
+	const codes = [
+		...new Set(errors.map((entry) => entry?.extensions?.code).filter(isNonEmptyString)),
+	];
+
+	return {
+		message: messages.length > 0 ? messages.join('; ') : undefined,
+		code: codes.length > 0 ? codes.join(', ') : undefined,
+	};
+}
+
+function isNonEmptyString(value: unknown): value is string {
+	return typeof value === 'string' && value.trim() !== '';
+}
+
+function isHttpError(error: unknown): error is DirectusHttpError {
+	if (typeof error !== 'object' || error === null) {
+		return false;
+	}
+	const httpError = error as DirectusHttpError;
+	return (
+		httpError.isAxiosError === true ||
+		(typeof httpError.response === 'object' && httpError.response !== null) ||
+		typeof httpError.statusCode === 'number'
+	);
+}
+
+/**
+ * Converts anything thrown while talking to Directus into an n8n error, using the Directus
+ * error message when the response has one
+ */
+export function toNodeError(
+	node: INode,
+	error: unknown,
+	itemIndex?: number,
+): NodeApiError | NodeOperationError {
+	if (error instanceof NodeApiError || error instanceof NodeOperationError) {
+		if (itemIndex !== undefined && error.context.itemIndex === undefined) {
+			error.context.itemIndex = itemIndex;
+		}
 		return error;
 	}
 
-	if (typeof error === 'object' && error !== null) {
-		const httpError = error as DirectusHttpError;
-		const statusCode =
-			httpError.statusCode ||
-			httpError.status ||
-			httpError.response?.statusCode ||
-			httpError.response?.status;
-
-		if (statusCode === 403) {
-			return new Error('Permission error: Token does not have access to this resource.');
-		}
-
-		const responseData = httpError.response?.data || httpError.response?.body;
-
-		if (responseData) {
-			let parsedData = responseData;
-			if (typeof responseData === 'string') {
-				try {
-					parsedData = JSON.parse(responseData);
-				} catch {
-					return new Error(`Request failed with status code ${statusCode || 400}: ${responseData}`);
-				}
-			}
-
-			if (
-				typeof parsedData === 'object' &&
-				parsedData !== null &&
-				'errors' in parsedData &&
-				Array.isArray((parsedData as { errors?: unknown[] }).errors) &&
-				(parsedData as { errors: Array<{ message?: string }> }).errors.length > 0
-			) {
-				const messages = (parsedData as { errors: Array<{ message?: string }> }).errors
-					.map((x) => x.message || String(x))
-					.join(', ');
-				return new Error(`Request failed with status code ${statusCode || 400}: ${messages}`);
-			}
-
-			if (
-				typeof parsedData === 'object' &&
-				parsedData !== null &&
-				'message' in parsedData &&
-				typeof (parsedData as { message?: unknown }).message === 'string'
-			) {
-				return new Error(
-					`Request failed with status code ${statusCode || 400}: ${(parsedData as { message: string }).message}`,
-				);
-			}
-		}
-
-		if (statusCode) {
-			return new Error(
-				`Request failed with status code ${statusCode}: ${httpError.message || httpError.response?.statusMessage || 'Unknown error'}`,
-			);
-		}
-
-		if (httpError.message) {
-			return new Error(httpError.message);
-		}
+	if (isHttpError(error)) {
+		const { message, code } = readDirectusErrors(error);
+		return new NodeApiError(node, error as unknown as JsonObject, {
+			message,
+			description: code ? `Directus error code: ${code}` : undefined,
+			itemIndex,
+		});
 	}
 
-	return new Error(String(error) || 'An unknown error occurred');
+	return new NodeOperationError(node, error instanceof Error ? error : String(error), {
+		itemIndex,
+	});
 }
 
 // API fetch functions - thin wrappers around fetchFromDirectus for type safety and clarity
