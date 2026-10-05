@@ -543,24 +543,54 @@ describe('Directus Node', () => {
 			});
 		});
 
-		it('should mark failed items so n8n routes them to the error output', async () => {
-			mockExecuteFunctions.continueOnFail.mockReturnValue(true);
-			mockExecuteFunctions.getNodeParameter
-				.mockReturnValueOnce('item')
-				.mockReturnValueOnce('get')
-				.mockReturnValueOnce('posts')
-				.mockReturnValueOnce('1');
-			mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(
-				directusError(403, "You don't have permission to access this.", 'FORBIDDEN'),
-			);
+		describe('error output routing', () => {
+			// WorkflowExecute.handleNodeErrorOutput: which items n8n sends to the error output, before and
+			// after n8n-io/n8n#35939 (2.36.0, backported to 2.34.6 and 2.35.3)
+			const routesWithoutDetailsRule = (json: Record<string, unknown>) =>
+				Boolean(json.error) &&
+				(Object.keys(json).length === 1 ||
+					(Boolean(json.message) && Object.keys(json).length === 2));
+			const routesWithDetailsRule = (json: Record<string, unknown>) =>
+				Boolean(json.error) &&
+				Object.keys(json).every((key) => ['error', 'message', 'details'].includes(key));
 
-			const [[item]] = await node.execute.call(mockExecuteFunctions);
+			async function failedItem(onError: string) {
+				mockExecuteFunctions.continueOnFail.mockReturnValue(true);
+				mockExecuteFunctions.getNode.mockReturnValue({
+					...mockExecuteFunctions.getNode(),
+					onError,
+				});
+				mockExecuteFunctions.getNodeParameter
+					.mockReturnValueOnce('item')
+					.mockReturnValueOnce('get')
+					.mockReturnValueOnce('posts')
+					.mockReturnValueOnce('1');
+				mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(
+					directusError(403, "You don't have permission to access this.", 'FORBIDDEN'),
+				);
+				const [[item]] = await node.execute.call(mockExecuteFunctions);
+				return item;
+			}
 
-			// Mirrors WorkflowExecute.handleNodeErrorOutput: json limited to these keys
-			expect(item.error).toBeUndefined();
-			expect(
-				Object.keys(item.json).every((key) => ['error', 'message', 'details'].includes(key)),
-			).toBe(true);
+			it('outputs only { error } so every n8n version routes it to the error output', async () => {
+				const item = await failedItem('continueErrorOutput');
+
+				expect(item.error).toBeUndefined();
+				expect(item.json).toEqual({ error: "You don't have permission to access this." });
+				expect(routesWithoutDetailsRule(item.json)).toBe(true);
+				expect(routesWithDetailsRule(item.json)).toBe(true);
+				expect(item.pairedItem).toEqual({ item: 0 });
+			});
+
+			it('adds details on the regular output', async () => {
+				const item = await failedItem('continueRegularOutput');
+
+				expect(item.error).toBeUndefined();
+				expect(item.json).toMatchObject({
+					error: "You don't have permission to access this.",
+					details: { httpCode: '403', code: 'FORBIDDEN' },
+				});
+			});
 		});
 
 		it('should leave out httpCode for network errors with continueOnFail', async () => {

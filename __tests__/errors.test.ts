@@ -97,7 +97,22 @@ describe('readDirectusErrors', () => {
 				{ message: '  ' },
 			],
 		});
-		expect(readDirectusErrors(error)).toMatchObject({ message: undefined, code: undefined });
+		expect(readDirectusErrors(error)).toEqual({
+			message: undefined,
+			code: undefined,
+			errors: [{ message: '' }, { message: 42 }, { extensions: { code: 7 } }, { message: '  ' }],
+		});
+	});
+
+	it('drops non-object entries from the error list', () => {
+		const error = axiosError(400, {
+			errors: [null, 'oops', 7, ['nested'], { message: 'Real problem' }],
+		});
+		expect(readDirectusErrors(error)).toEqual({
+			message: 'Real problem',
+			code: undefined,
+			errors: [{ message: 'Real problem' }],
+		});
 	});
 
 	it.each([

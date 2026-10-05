@@ -112,6 +112,21 @@ describe('DirectusTrigger Node', () => {
 			});
 		});
 
+		it('should not double the wording when Directus returns no flow id', async () => {
+			mockWebhookFunctions.getNodeParameter
+				.mockReturnValueOnce('item')
+				.mockReturnValueOnce('create')
+				.mockReturnValueOnce('posts');
+			mockWebhookFunctions.getWorkflowStaticData.mockReturnValue({});
+			mockWebhookFunctions.helpers.httpRequestWithAuthentication
+				.mockResolvedValueOnce({ data: [] })
+				.mockResolvedValueOnce({ data: {} });
+
+			await expect(node.webhookMethods!.default!.create.call(mockWebhookFunctions)).rejects.toThrow(
+				/^Failed to create flow: N8N - Create Posts$/,
+			);
+		});
+
 		it.each([
 			['404', 404],
 			['403', 403],

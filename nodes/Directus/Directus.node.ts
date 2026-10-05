@@ -231,8 +231,14 @@ export class Directus implements INodeType {
 					throw nodeError;
 				}
 
-				// n8n only routes items to the error output when json has nothing but error/message/details keys.
-				// Setting item.error instead would make n8n replace json with { error } and drop the details.
+				// n8n 1.x and 2.x before 2.36 (n8n-io/n8n#35939) only route items to the error output when
+				// json is exactly { error }, and setting item.error makes n8n replace json with { error }
+				// anyway, so details only go to the regular output
+				if (this.getNode().onError === 'continueErrorOutput') {
+					returnData.push({ json: { error: nodeError.message }, pairedItem: { item: i } });
+					continue;
+				}
+
 				const { code, errors } = readDirectusErrors(error);
 				const httpCode =
 					nodeError instanceof NodeApiError && /^\d{3}$/.test(nodeError.httpCode ?? '')

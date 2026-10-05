@@ -78,7 +78,9 @@ type DirectusErrorSummary = {
 
 function summarizeDirectusBody(body: unknown): DirectusErrorSummary {
 	const errors = Array.isArray((body as DirectusErrorBody | undefined)?.errors)
-		? (body as Required<DirectusErrorBody>).errors
+		? (body as Required<DirectusErrorBody>).errors.filter(
+				(entry) => typeof entry === 'object' && entry !== null && !Array.isArray(entry),
+			)
 		: [];
 	const messages = errors.map((entry) => entry?.message).filter(isNonEmptyString);
 	const codes = [

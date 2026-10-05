@@ -72,10 +72,37 @@ npm install @directus/n8n-nodes-directus
 - **Smart Field Processing**: Handles complex field types and relationships
 - **Simplify Option**: Returns essential fields only for Users and Files "Get Many" operations
 - **Raw JSON Operations**: Full support for raw JSON data/query parameters for advanced use cases (available for all CRUD operations)
-- **Robust Error Handling**: Comprehensive error handling with detailed error messages
+- **Directus Error Messages**: Errors show the message Directus returned (e.g. `Value "Hello" for field "title" in collection "posts" has to be unique.`), its error code, the HTTP status, and which input item failed
 - **Webhook Management**: Automatic webhook creation and cleanup for trigger nodes
 - **Type Safety**: Full TypeScript support with proper type definitions
 - **UX Compliance**: Follows n8n community node UX guidelines with proper naming and placeholders
+
+### Error Output
+
+When a node's **On Error** setting is **Continue**, each failed item is output in place of its result:
+
+```json
+{
+	"error": "Value \"Hello\" for field \"title\" in collection \"posts\" has to be unique.",
+	"details": {
+		"httpCode": "400",
+		"code": "RECORD_NOT_UNIQUE",
+		"errors": [
+			{
+				"message": "Value \"Hello\" for field \"title\" in collection \"posts\" has to be unique.",
+				"extensions": {
+					"code": "RECORD_NOT_UNIQUE",
+					"collection": "posts",
+					"field": "title",
+					"value": "Hello"
+				}
+			}
+		]
+	}
+}
+```
+
+`details` is included when the request got an HTTP response. With **Continue (using error output)**, failed items go to the error output as `{ "error": "..." }` without `details`, because n8n 1.x and 2.x before 2.36 only route items with that exact shape to the error output.
 
 ## Credentials
 
