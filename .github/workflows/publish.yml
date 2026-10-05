@@ -17,25 +17,19 @@
 #
 # ─── ONE-TIME SETUP ────────────────────────────────────────────────────────────
 #
-# Option A — OIDC Trusted Publishing (recommended, no long-lived secrets):
-#   1. Log in to npmjs.com and open your package's settings.
-#   2. Under "Publish access" → "Trusted Publishers", click "Add a publisher".
-#   3. Select GitHub Actions and fill in:
-#        Repository owner: <your-github-username-or-org>
-#        Repository name:  <your-repo-name>
+# This repo uses OIDC Trusted Publishing only. No npm token is read, so the
+# org-level NPM_TOKEN secret never enters this job.
+#
+#   1. npmjs.com → package settings → Trusted Publishers → GitHub Actions:
+#        Repository owner: directus
+#        Repository name:  n8n-nodes-directus
 #        Workflow name:    publish.yml
-#        Environment:      (leave blank unless you use GitHub Environments)
-#   4. Leave the NPM_TOKEN secret unset in this repository. GitHub's OIDC
-#      token is used instead — no secret ever touches your repo settings.
+#        Environment:      npm
+#        Allowed actions:  npm publish
+#   2. GitHub → Settings → Environments → "npm": required reviewers approve
+#      each publish, and only version tags may deploy to it.
 #
-# Option B — npm Automation Token (fallback):
-#   1. On npmjs.com: Access Tokens → Generate New Token → Granular Access Token.
-#      Scope it to this package with "Read and write" publish permission.
-#   2. In GitHub: Settings → Secrets and variables → Actions → New secret.
-#      Name it NPM_TOKEN and paste the token value.
-#
-# Both options work with --provenance. Provenance is signed by GitHub's OIDC
-# infrastructure regardless of how npm authentication is handled.
+# Provenance is signed by GitHub's OIDC infrastructure.
 #
 # ─── TAG CONVENTION ────────────────────────────────────────────────────────────
 #
@@ -65,6 +59,8 @@ jobs:
   publish:
     name: Publish to npm
     runs-on: ubuntu-latest
+    # Pauses for a required reviewer, and npm only trusts runs from this environment
+    environment: npm
 
     permissions:
       # Required to mint an OIDC token for npm provenance attestation.
@@ -79,7 +75,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 'lts/*'
-          cache: 'npm'
+          # No dependency cache in release builds, per npm's trusted publishing guidance
 
       - name: Install dependencies
         run: 'npm ci'
@@ -87,13 +83,4 @@ jobs:
       - name: Release
         # Publishes to npm with a provenance attestation (requires id-token: write above).
         # Lint and build run automatically as part of the release process.
-        #
-        # Option A (OIDC): leave NPM_TOKEN unset — the token step is skipped and
-        #   npm uses the OIDC exchange instead.
-        # Option B (token): set NPM_TOKEN in repo secrets — it is written to
-        #   .npmrc here before publishing.
-        run: |
-          [ -n "$NPM_TOKEN" ] && npm config set //registry.npmjs.org/:_authToken "$NPM_TOKEN"
-          npm run release
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm run release
