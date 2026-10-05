@@ -231,15 +231,23 @@ export class Directus implements INodeType {
 					throw nodeError;
 				}
 
-				const { code } = readDirectusErrors(error);
+				// n8n only routes items to the error output when json has nothing but error/message/details keys.
+				// Setting item.error instead would make n8n replace json with { error } and drop the details.
+				const { code, errors } = readDirectusErrors(error);
+				const httpCode =
+					nodeError instanceof NodeApiError && /^\d{3}$/.test(nodeError.httpCode ?? '')
+						? nodeError.httpCode
+						: undefined;
+				const details = {
+					...(httpCode ? { httpCode } : {}),
+					...(code ? { code } : {}),
+					...(errors ? { errors } : {}),
+				};
 				returnData.push({
 					json: {
 						error: nodeError.message,
-						...(nodeError instanceof NodeApiError && nodeError.httpCode
-							? { httpCode: nodeError.httpCode }
-							: {}),
-						...(code ? { code } : {}),
-					},
+						...(Object.keys(details).length > 0 ? { details } : {}),
+					} as IDataObject,
 					pairedItem: { item: i },
 				});
 			}

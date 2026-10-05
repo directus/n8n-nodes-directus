@@ -59,7 +59,7 @@ async function fetchFromDirectus<T>(
 
 function getResponseBody(error: DirectusHttpError): unknown {
 	// httpRequest (axios) keeps the body on response.data; the legacy helpers.request puts it on error.error
-	const body = error.response?.data ?? error.response?.body ?? error.error;
+	const body = error.response?.data ?? error.error;
 	if (typeof body !== 'string') {
 		return body;
 	}
@@ -71,9 +71,14 @@ function getResponseBody(error: DirectusHttpError): unknown {
 }
 
 /**
- * Pulls the human-readable messages and error codes out of a Directus `{ errors: [...] }` body
+ * Pulls the human-readable messages, error codes, and raw error entries out of a Directus
+ * `{ errors: [...] }` body
  */
-export function readDirectusErrors(error: unknown): { message?: string; code?: string } {
+export function readDirectusErrors(error: unknown): {
+	message?: string;
+	code?: string;
+	errors?: DirectusErrorBody['errors'];
+} {
 	if (typeof error !== 'object' || error === null) {
 		return {};
 	}
@@ -88,6 +93,7 @@ export function readDirectusErrors(error: unknown): { message?: string; code?: s
 	return {
 		message: messages.length > 0 ? messages.join('; ') : undefined,
 		code: codes.length > 0 ? codes.join(', ') : undefined,
+		errors: errors.length > 0 ? errors : undefined,
 	};
 }
 
@@ -125,11 +131,24 @@ export function toNodeError(
 
 	if (isHttpError(error)) {
 		const { message, code } = readDirectusErrors(error);
-		return new NodeApiError(node, error as unknown as JsonObject, {
+		const apiError = new NodeApiError(node, error as unknown as JsonObject, {
 			message,
 			description: code ? `Directus error code: ${code}` : undefined,
 			itemIndex,
 		});
+
+		// NodeApiError swaps messages mentioning codes like ECONNREFUSED for generic text
+		if (message) {
+			apiError.message = message;
+		}
+
+		// NodeApiError only keeps object bodies found on response.data, which misses legacy uploads and string bodies
+		const body = getResponseBody(error);
+		if (apiError.context.data === undefined && typeof body === 'object' && body !== null) {
+			apiError.context.data = body as JsonObject;
+		}
+
+		return apiError;
 	}
 
 	return new NodeOperationError(node, error instanceof Error ? error : String(error), {

@@ -524,17 +524,64 @@ describe('Directus Node', () => {
 
 			const result = await node.execute.call(mockExecuteFunctions);
 
-			expect(result[0]).toEqual([
-				{ json: { id: 1, title: 'Hello' }, pairedItem: { item: 0 } },
-				{
-					json: {
-						error: 'Value for field "title" in collection "posts" has to be unique.',
+			expect(result[0][0]).toEqual({ json: { id: 1, title: 'Hello' }, pairedItem: { item: 0 } });
+			expect(result[0][1]).toMatchObject({
+				json: {
+					error: 'Value for field "title" in collection "posts" has to be unique.',
+					details: {
 						httpCode: '400',
 						code: 'RECORD_NOT_UNIQUE',
+						errors: [
+							{
+								message: 'Value for field "title" in collection "posts" has to be unique.',
+								extensions: { code: 'RECORD_NOT_UNIQUE' },
+							},
+						],
 					},
-					pairedItem: { item: 1 },
 				},
-			]);
+				pairedItem: { item: 1 },
+			});
+		});
+
+		it('should mark failed items so n8n routes them to the error output', async () => {
+			mockExecuteFunctions.continueOnFail.mockReturnValue(true);
+			mockExecuteFunctions.getNodeParameter
+				.mockReturnValueOnce('item')
+				.mockReturnValueOnce('get')
+				.mockReturnValueOnce('posts')
+				.mockReturnValueOnce('1');
+			mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(
+				directusError(403, "You don't have permission to access this.", 'FORBIDDEN'),
+			);
+
+			const [[item]] = await node.execute.call(mockExecuteFunctions);
+
+			// Mirrors WorkflowExecute.handleNodeErrorOutput: json limited to these keys
+			expect(item.error).toBeUndefined();
+			expect(
+				Object.keys(item.json).every((key) => ['error', 'message', 'details'].includes(key)),
+			).toBe(true);
+		});
+
+		it('should leave out httpCode for network errors with continueOnFail', async () => {
+			mockExecuteFunctions.continueOnFail.mockReturnValue(true);
+			mockExecuteFunctions.getNodeParameter
+				.mockReturnValueOnce('item')
+				.mockReturnValueOnce('get')
+				.mockReturnValueOnce('posts')
+				.mockReturnValueOnce('1');
+			mockExecuteFunctions.helpers.httpRequest.mockRejectedValue(
+				Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:8055'), {
+					isAxiosError: true,
+					code: 'ECONNREFUSED',
+				}),
+			);
+
+			const [[item]] = await node.execute.call(mockExecuteFunctions);
+
+			expect(item.json).toEqual({
+				error: 'The service refused the connection - perhaps it is offline',
+			});
 		});
 
 		it('should output only the message for non-HTTP errors with continueOnFail', async () => {

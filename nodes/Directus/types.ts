@@ -149,7 +149,6 @@ export interface DirectusHttpError {
 	response?: {
 		status?: number;
 		data?: unknown;
-		body?: unknown;
 	};
 	error?: unknown;
 	message?: string;

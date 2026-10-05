@@ -1,10 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { NodeApiError, NodeOperationError, type INode } from 'n8n-workflow';
-import {
-	getCollectionsFromAPI,
-	readDirectusErrors,
-	toNodeError,
-} from '../nodes/Directus/methods/api';
+import { readDirectusErrors, toNodeError } from '../nodes/Directus/methods/api';
+import { getCollectionsLoadOptions } from '../nodes/Directus/methods/loadOptions';
 
 const node: INode = {
 	id: 'test-node-id',
@@ -46,6 +43,7 @@ const uniqueError = {
 describe('readDirectusErrors', () => {
 	it('reads message and code from an axios error', () => {
 		expect(readDirectusErrors(axiosError(400, uniqueError))).toEqual({
+			errors: uniqueError.errors,
 			message: 'Value for field "title" in collection "posts" has to be unique.',
 			code: 'RECORD_NOT_UNIQUE',
 		});
@@ -60,14 +58,14 @@ describe('readDirectusErrors', () => {
 			],
 		});
 
-		expect(readDirectusErrors(error)).toEqual({
+		expect(readDirectusErrors(error)).toMatchObject({
 			message: 'First problem; Second problem; Third problem',
 			code: 'INVALID_PAYLOAD, FAILED_VALIDATION',
 		});
 	});
 
 	it('parses a JSON string body', () => {
-		expect(readDirectusErrors(axiosError(400, JSON.stringify(uniqueError)))).toEqual({
+		expect(readDirectusErrors(axiosError(400, JSON.stringify(uniqueError)))).toMatchObject({
 			message: 'Value for field "title" in collection "posts" has to be unique.',
 			code: 'RECORD_NOT_UNIQUE',
 		});
@@ -78,8 +76,8 @@ describe('readDirectusErrors', () => {
 			message: 'Value for field "title" in collection "posts" has to be unique.',
 			code: 'RECORD_NOT_UNIQUE',
 		};
-		expect(readDirectusErrors(legacyRequestError(400, uniqueError))).toEqual(expected);
-		expect(readDirectusErrors(legacyRequestError(400, JSON.stringify(uniqueError)))).toEqual(
+		expect(readDirectusErrors(legacyRequestError(400, uniqueError))).toMatchObject(expected);
+		expect(readDirectusErrors(legacyRequestError(400, JSON.stringify(uniqueError)))).toMatchObject(
 			expected,
 		);
 	});
@@ -94,7 +92,7 @@ describe('readDirectusErrors', () => {
 				{ message: '  ' },
 			],
 		});
-		expect(readDirectusErrors(error)).toEqual({ message: undefined, code: undefined });
+		expect(readDirectusErrors(error)).toMatchObject({ message: undefined, code: undefined });
 	});
 
 	it.each([
@@ -154,6 +152,25 @@ describe('toNodeError', () => {
 		expect(error.message).toBe('Value for field "title" in collection "posts" has to be unique.');
 		expect((error as NodeApiError).httpCode).toBe('400');
 		expect(error.context.itemIndex).toBe(1);
+	});
+
+	it('keeps a Directus message that mentions a Node error code', () => {
+		const message = 'Webhook to http://example.com failed: ECONNREFUSED';
+		const error = toNodeError(
+			node,
+			axiosError(500, { errors: [{ message, extensions: { code: 'INTERNAL_SERVER_ERROR' } }] }),
+		);
+
+		expect(error.message).toBe(message);
+	});
+
+	it.each([
+		['legacy request body', legacyRequestError(400, uniqueError)],
+		['legacy request string body', legacyRequestError(400, JSON.stringify(uniqueError))],
+		['axios string body', axiosError(400, JSON.stringify(uniqueError))],
+		['axios object body', axiosError(400, uniqueError)],
+	])('keeps the parsed response body on the error for %s', (_label, thrown) => {
+		expect(toNodeError(node, thrown).context.data).toEqual(uniqueError);
 	});
 
 	it('falls back to n8n defaults when the body has no Directus errors', () => {
@@ -238,11 +255,10 @@ describe('load options errors', () => {
 					}),
 				),
 			},
-		};
+		} as never;
 
-		await expect(getCollectionsFromAPI(loadOptionsFunctions as never)).rejects.toMatchObject({
-			message: "You don't have permission to access this.",
-			httpCode: '403',
-		});
+		await expect(
+			getCollectionsLoadOptions.call(loadOptionsFunctions, loadOptionsFunctions),
+		).rejects.toThrow("You don't have permission to access this.");
 	});
 });
