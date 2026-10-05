@@ -1,7 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
 import { NodeApiError, NodeOperationError, type INode } from 'n8n-workflow';
 import { readDirectusErrors, toNodeError } from '../nodes/Directus/methods/api';
-import { getCollectionsLoadOptions } from '../nodes/Directus/methods/loadOptions';
+import {
+	getCollectionFieldsLoadOptions,
+	getCollectionsLoadOptions,
+	getRolesLoadOptions,
+} from '../nodes/Directus/methods/loadOptions';
+import { getCollectionsLoadOptions as getTriggerCollectionsLoadOptions } from '../nodes/DirectusTrigger/methods/loadOptions';
 
 const node: INode = {
 	id: 'test-node-id',
@@ -207,6 +212,21 @@ describe('toNodeError', () => {
 		expect(toNodeError(node, original, 5).context.itemIndex).toBe(1);
 	});
 
+	it('replaces n8n generic text on NodeApiErrors from httpRequestWithAuthentication', () => {
+		// httpRequestWithAuthentication throws new NodeApiError(node, axiosError)
+		const wrapped = new NodeApiError(node, axiosError(403, uniqueError) as never);
+		expect(wrapped.message).toBe('Forbidden - perhaps check your credentials?');
+
+		const error = toNodeError(node, wrapped, 2);
+
+		expect(error).toBe(wrapped);
+		expect(error.message).toBe('Value for field "title" in collection "posts" has to be unique.');
+		expect(error.description).toBe('Directus error code: RECORD_NOT_UNIQUE');
+		expect((error as NodeApiError).httpCode).toBe('403');
+		expect(error.context.itemIndex).toBe(2);
+		expect(readDirectusErrors(wrapped)).toMatchObject({ code: 'RECORD_NOT_UNIQUE' });
+	});
+
 	it('passes NodeApiErrors through', () => {
 		const original = new NodeApiError(node, { message: 'already wrapped' });
 		expect(toNodeError(node, original, 0)).toBe(original);
@@ -239,26 +259,30 @@ describe('toNodeError', () => {
 });
 
 describe('load options errors', () => {
-	it('surfaces the Directus message when a dropdown fails to load', async () => {
-		const loadOptionsFunctions = {
+	const forbidden = () =>
+		axiosError(403, {
+			errors: [
+				{ message: "You don't have permission to access this.", extensions: { code: 'FORBIDDEN' } },
+			],
+		});
+	const loadOptionsFunctions = () =>
+		({
 			getCredentials: vi.fn().mockResolvedValue({ url: 'https://test.directus.app', token: 't' }),
 			getNode: vi.fn(() => node),
-			helpers: {
-				httpRequest: vi.fn().mockRejectedValue(
-					axiosError(403, {
-						errors: [
-							{
-								message: "You don't have permission to access this.",
-								extensions: { code: 'FORBIDDEN' },
-							},
-						],
-					}),
-				),
-			},
-		} as never;
+			getCurrentNodeParameter: vi.fn((name: string) => (name === 'collection' ? 'posts' : 'get')),
+			helpers: { httpRequest: vi.fn().mockRejectedValue(forbidden()) },
+		}) as never;
 
-		await expect(
-			getCollectionsLoadOptions.call(loadOptionsFunctions, loadOptionsFunctions),
-		).rejects.toThrow("You don't have permission to access this.");
+	it.each([
+		['action node collections', () => getCollectionsLoadOptions, 'collections'],
+		['trigger node collections', () => getTriggerCollectionsLoadOptions, 'collections'],
+		['collection fields', () => getCollectionFieldsLoadOptions, 'fields'],
+		['roles', () => getRolesLoadOptions, 'roles'],
+	])('shows the Directus message once for %s', async (_label, getLoader, resource) => {
+		const functions = loadOptionsFunctions();
+
+		await expect(getLoader().call(functions)).rejects.toMatchObject({
+			message: `Failed to load ${resource}: You don't have permission to access this.`,
+		});
 	});
 });

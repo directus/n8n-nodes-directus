@@ -70,21 +70,16 @@ function getResponseBody(error: DirectusHttpError): unknown {
 	}
 }
 
-/**
- * Pulls the human-readable messages, error codes, and raw error entries out of a Directus
- * `{ errors: [...] }` body
- */
-export function readDirectusErrors(error: unknown): {
+type DirectusErrorSummary = {
 	message?: string;
 	code?: string;
 	errors?: DirectusErrorBody['errors'];
-} {
-	if (typeof error !== 'object' || error === null) {
-		return {};
-	}
+};
 
-	const body = getResponseBody(error as DirectusHttpError) as DirectusErrorBody | undefined;
-	const errors = Array.isArray(body?.errors) ? body.errors : [];
+function summarizeDirectusBody(body: unknown): DirectusErrorSummary {
+	const errors = Array.isArray((body as DirectusErrorBody | undefined)?.errors)
+		? (body as Required<DirectusErrorBody>).errors
+		: [];
 	const messages = errors.map((entry) => entry?.message).filter(isNonEmptyString);
 	const codes = [
 		...new Set(errors.map((entry) => entry?.extensions?.code).filter(isNonEmptyString)),
@@ -95,6 +90,30 @@ export function readDirectusErrors(error: unknown): {
 		code: codes.length > 0 ? codes.join(', ') : undefined,
 		errors: errors.length > 0 ? errors : undefined,
 	};
+}
+
+/**
+ * Pulls the human-readable messages, error codes, and raw error entries out of a Directus
+ * `{ errors: [...] }` body
+ */
+export function readDirectusErrors(error: unknown): DirectusErrorSummary {
+	if (typeof error !== 'object' || error === null) {
+		return {};
+	}
+	if (error instanceof NodeApiError) {
+		return summarizeDirectusBody(error.context.data);
+	}
+	return summarizeDirectusBody(getResponseBody(error as DirectusHttpError));
+}
+
+// NodeApiError swaps messages mentioning codes like ECONNREFUSED for generic text, so set them after construction
+function applyDirectusSummary(apiError: NodeApiError, { message, code }: DirectusErrorSummary) {
+	if (message) {
+		apiError.message = message;
+	}
+	if (code) {
+		apiError.description = `Directus error code: ${code}`;
+	}
 }
 
 function isNonEmptyString(value: unknown): value is string {
@@ -126,21 +145,17 @@ export function toNodeError(
 		if (itemIndex !== undefined && error.context.itemIndex === undefined) {
 			error.context.itemIndex = itemIndex;
 		}
+		// httpRequestWithAuthentication already wraps failures in a NodeApiError with n8n's generic text
+		if (error instanceof NodeApiError) {
+			applyDirectusSummary(error, readDirectusErrors(error));
+		}
 		return error;
 	}
 
 	if (isHttpError(error)) {
-		const { message, code } = readDirectusErrors(error);
-		const apiError = new NodeApiError(node, error as unknown as JsonObject, {
-			message,
-			description: code ? `Directus error code: ${code}` : undefined,
-			itemIndex,
-		});
-
-		// NodeApiError swaps messages mentioning codes like ECONNREFUSED for generic text
-		if (message) {
-			apiError.message = message;
-		}
+		const summary = readDirectusErrors(error);
+		const apiError = new NodeApiError(node, error as unknown as JsonObject, { itemIndex });
+		applyDirectusSummary(apiError, summary);
 
 		// NodeApiError only keeps object bodies found on response.data, which misses legacy uploads and string bodies
 		const body = getResponseBody(error);
