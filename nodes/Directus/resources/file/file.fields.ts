@@ -137,6 +137,6 @@ export const fileFields: INodeProperties[] = [
 			},
 		},
 		description:
-			'Raw JSON query parameters for the GET request. Supports all Directus query parameters including fields, filter, sort, limit, etc. Example: {"fields": ["*"], "filter": {"type": {"_in": ["image/jpeg", "image/png"]}}, "limit": 10}',
+			'Raw JSON query parameters for the GET request. Supports all Directus query parameters including fields, filter, sort, limit, offset, etc. Omitting limit uses the Directus default (usually 100). This operation does not paginate — use Get Many with Return All to fetch every item. Example: {"fields": ["*"], "filter": {"type": {"_in": ["image/jpeg", "image/png"]}}, "limit": 10}',
 	},
 ];
