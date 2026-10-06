@@ -1,4 +1,4 @@
-import { NodeOperationError, type ILoadOptionsFunctions } from 'n8n-workflow';
+import type { ILoadOptionsFunctions } from 'n8n-workflow';
 import { getCollectionsFromAPI, getFieldsFromAPI, getRelationsFromAPI } from './api';
 import { formatFieldName } from './utils';
 import type {
@@ -168,35 +168,19 @@ async function getFields(
 	functions: ILoadOptionsFunctions,
 	collection: string,
 ): Promise<DirectusField[]> {
-	try {
-		const fields = await getFieldsFromAPI(functions, collection);
-		fields.sort((a, b) => (a.meta?.sort ?? 0) - (b.meta?.sort ?? 0));
-		return fields;
-	} catch (error) {
-		const formattedError = error instanceof Error ? error : new Error(String(error));
-		throw new NodeOperationError(
-			functions.getNode(),
-			`Failed to fetch fields for collection '${collection}': ${formattedError.message}`,
-		);
-	}
+	const fields = await getFieldsFromAPI(functions, collection);
+	fields.sort((a, b) => (a.meta?.sort ?? 0) - (b.meta?.sort ?? 0));
+	return fields;
 }
 
 export async function getCollections(
 	functions: ILoadOptionsFunctions,
 ): Promise<DirectusCollection[]> {
-	try {
-		const collections = await getCollectionsFromAPI(functions);
-		return collections.filter((c) => {
-			if (!c?.collection) return false;
-			return !c.collection.startsWith('directus_');
-		});
-	} catch (error) {
-		const formattedError = error instanceof Error ? error : new Error(String(error));
-		throw new NodeOperationError(
-			functions.getNode(),
-			`Failed to fetch collections: ${formattedError.message}`,
-		);
-	}
+	const collections = await getCollectionsFromAPI(functions);
+	return collections.filter((c) => {
+		if (!c?.collection) return false;
+		return !c.collection.startsWith('directus_');
+	});
 }
 
 export async function convertCollectionFieldsToN8n(

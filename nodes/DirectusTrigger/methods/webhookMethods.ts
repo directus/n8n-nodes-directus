@@ -1,5 +1,6 @@
-import { IHookFunctions, NodeOperationError } from 'n8n-workflow';
+import { IHookFunctions, NodeApiError, NodeOperationError } from 'n8n-workflow';
 import type { DirectusCredentials } from '../../Directus/types';
+import { toNodeError } from '../../Directus/methods/api';
 
 /**
  * Capitalize the first letter of each word in a string
@@ -32,12 +33,8 @@ export async function checkExists(this: IHookFunctions): Promise<boolean> {
 			url: flowCheckUrl,
 		});
 		return true;
-	} catch (error: unknown) {
-		const httpCode = (error as { cause?: { httpCode?: string } })?.cause?.httpCode;
-		if (httpCode === '404') {
-			delete webhookData.flowId;
-			return false;
-		}
+	} catch {
+		// Missing or unreadable flow: forget it so create() sets up a fresh one
 	}
 
 	delete webhookData.flowId;
@@ -317,10 +314,12 @@ export async function create(this: IHookFunctions): Promise<boolean> {
 			webhookData.flowId = prodFlowId;
 		}
 	} catch (error) {
-		throw new NodeOperationError(
-			this.getNode(),
-			`Failed to create/configure flows: ${(error as Error).message}`,
-		);
+		const nodeError = toNodeError(this.getNode(), error);
+		// Our own NodeOperationErrors above already say what failed
+		if (nodeError instanceof NodeApiError) {
+			nodeError.message = `Failed to set up the Directus flow: ${nodeError.message}`;
+		}
+		throw nodeError;
 	}
 
 	return true;

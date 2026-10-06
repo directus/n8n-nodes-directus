@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { NodeApiError } from 'n8n-workflow';
 import { DirectusTrigger } from '../nodes/DirectusTrigger/DirectusTrigger.node';
 import { createMockWebhookFunctions } from './helpers';
 
@@ -64,6 +65,98 @@ describe('DirectusTrigger Node', () => {
 			);
 			expect(scriptCall).toBeDefined();
 			expect(scriptCall?.[1]?.body.options.code).toContain('last_page');
+		});
+
+		it.each([
+			['raw axios error', (e: Error) => e],
+			['n8n-wrapped NodeApiError', (e: Error) => new NodeApiError({} as never, e as never)],
+		])('should show the Directus message when flow setup fails (%s)', async (_label, wrap) => {
+			mockWebhookFunctions.getNodeParameter
+				.mockReturnValueOnce('item')
+				.mockReturnValueOnce('create')
+				.mockReturnValueOnce('posts');
+			mockWebhookFunctions.getWorkflowStaticData.mockReturnValue({});
+			mockWebhookFunctions.helpers.httpRequestWithAuthentication
+				.mockResolvedValueOnce({ data: [] })
+				.mockRejectedValueOnce(
+					wrap(
+						Object.assign(new Error('Request failed with status code 403'), {
+							isAxiosError: true,
+							status: 403,
+							response: {
+								status: 403,
+								statusText: 'Forbidden',
+								headers: {},
+								data: {
+									errors: [
+										{
+											message: `You don't have permission to access collection "directus_flows" or it does not exist.`,
+											extensions: { code: 'FORBIDDEN' },
+										},
+									],
+								},
+							},
+						}),
+					),
+				);
+
+			const error = await node
+				.webhookMethods!.default!.create.call(mockWebhookFunctions)
+				.catch((e: unknown) => e);
+
+			expect(error).toBeInstanceOf(NodeApiError);
+			expect(error).toMatchObject({
+				message: `Failed to set up the Directus flow: You don't have permission to access collection "directus_flows" or it does not exist.`,
+				description: 'Directus error code: FORBIDDEN',
+				httpCode: '403',
+			});
+		});
+
+		it('should not double the wording when Directus returns no flow id', async () => {
+			mockWebhookFunctions.getNodeParameter
+				.mockReturnValueOnce('item')
+				.mockReturnValueOnce('create')
+				.mockReturnValueOnce('posts');
+			mockWebhookFunctions.getWorkflowStaticData.mockReturnValue({});
+			mockWebhookFunctions.helpers.httpRequestWithAuthentication
+				.mockResolvedValueOnce({ data: [] })
+				.mockResolvedValueOnce({ data: {} });
+
+			await expect(node.webhookMethods!.default!.create.call(mockWebhookFunctions)).rejects.toThrow(
+				/^Failed to create flow: N8N - Create Posts$/,
+			);
+		});
+
+		it.each([
+			['404', 404],
+			['403', 403],
+		])('should forget the stored flow when checking it returns %s', async (_label, status) => {
+			const staticData: { flowId?: string } = { flowId: 'flow-1' };
+			mockWebhookFunctions.getWorkflowStaticData.mockReturnValue(staticData);
+			mockWebhookFunctions.helpers.httpRequestWithAuthentication.mockRejectedValue(
+				Object.assign(new Error(`Request failed with status code ${status}`), {
+					isAxiosError: true,
+					response: { status, data: { errors: [{ message: 'nope' }] } },
+				}),
+			);
+
+			const result = await node.webhookMethods!.default!.checkExists.call(mockWebhookFunctions);
+
+			expect(result).toBe(false);
+			expect(staticData.flowId).toBeUndefined();
+		});
+
+		it('should keep the stored flow when it still exists', async () => {
+			const staticData = { flowId: 'flow-1' };
+			mockWebhookFunctions.getWorkflowStaticData.mockReturnValue(staticData);
+			mockWebhookFunctions.helpers.httpRequestWithAuthentication.mockResolvedValue({
+				data: { id: 'flow-1' },
+			});
+
+			const result = await node.webhookMethods!.default!.checkExists.call(mockWebhookFunctions);
+
+			expect(result).toBe(true);
+			expect(staticData.flowId).toBe('flow-1');
 		});
 
 		it('should delete webhook flow', async () => {

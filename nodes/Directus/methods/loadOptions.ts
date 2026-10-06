@@ -9,15 +9,6 @@ function handleLoadOptionsError(
 	resource: string,
 ): never {
 	const message = error instanceof Error ? error.message : String(error);
-
-	// Check if this is a permission error (api.ts throws this message)
-	if (message.includes('Permission error:')) {
-		throw new NodeOperationError(
-			functions.getNode(),
-			`Permission error: Token does not have access to ${resource}.`,
-		);
-	}
-
 	throw new NodeOperationError(functions.getNode(), `Failed to load ${resource}: ${message}`);
 }
 

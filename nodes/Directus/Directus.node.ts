@@ -3,13 +3,14 @@ import {
 	INodeExecutionData,
 	INodeType,
 	INodeTypeDescription,
+	NodeApiError,
 	NodeConnectionTypes,
 	NodeOperationError,
 	IHttpRequestOptions,
 	IDataObject,
 } from 'n8n-workflow';
 
-import { formatDirectusError } from './methods/api';
+import { readDirectusErrors, toNodeError } from './methods/api';
 import { simplifyUser, simplifyFile } from './methods/simplify';
 import { createAuthenticatedRequest } from './methods/request';
 import type {
@@ -225,21 +226,36 @@ export class Directus implements INodeType {
 					returnData.push({ json: processedData as IDataObject, pairedItem: { item: i } });
 				}
 			} catch (error) {
-				if (this.continueOnFail()) {
-					const errorMessage =
-						error instanceof Error
-							? error.message
-							: typeof error === 'object' && error !== null
-								? JSON.stringify(error)
-								: String(error);
-					returnData.push({
-						json: { error: errorMessage },
-						pairedItem: { item: i },
-					});
-				} else {
-					const formattedError = formatDirectusError(error);
-					throw new NodeOperationError(this.getNode(), formattedError.message);
+				const nodeError = toNodeError(this.getNode(), error, i);
+				if (!this.continueOnFail()) {
+					throw nodeError;
 				}
+
+				// n8n 1.x and 2.x before 2.36 (n8n-io/n8n#35939) only route items to the error output when
+				// json is exactly { error }, and setting item.error makes n8n replace json with { error }
+				// anyway, so details only go to the regular output
+				if (this.getNode().onError === 'continueErrorOutput') {
+					returnData.push({ json: { error: nodeError.message }, pairedItem: { item: i } });
+					continue;
+				}
+
+				const { code, errors } = readDirectusErrors(error);
+				const httpCode =
+					nodeError instanceof NodeApiError && /^\d{3}$/.test(nodeError.httpCode ?? '')
+						? nodeError.httpCode
+						: undefined;
+				const details = {
+					...(httpCode ? { httpCode } : {}),
+					...(code ? { code } : {}),
+					...(errors ? { errors } : {}),
+				};
+				returnData.push({
+					json: {
+						error: nodeError.message,
+						...(Object.keys(details).length > 0 ? { details } : {}),
+					} as IDataObject,
+					pairedItem: { item: i },
+				});
 			}
 		}
 
