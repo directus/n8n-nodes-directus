@@ -15,7 +15,7 @@ export class DirectusTrigger implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'Directus Trigger',
 		name: 'directusTrigger',
-		icon: 'file:directus.svg',
+		icon: { light: 'file:directus.svg', dark: 'file:directus-dark.svg' },
 		group: ['trigger'],
 		version: 1,
 		subtitle:
@@ -124,7 +124,6 @@ export class DirectusTrigger implements INodeType {
 				description: 'The event to trigger on (only upload is supported for files)',
 			},
 		],
-		usableAsTool: true,
 	};
 
 	webhookMethods = {

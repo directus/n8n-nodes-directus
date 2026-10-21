@@ -9,7 +9,7 @@ import {
 export class DirectusApi implements ICredentialType {
 	name = 'directusApi';
 	displayName = 'Directus API';
-	icon: Icon = 'file:directus.svg';
+	icon: Icon = { light: 'file:directus.svg', dark: 'file:directus-dark.svg' };
 	documentationUrl = 'https://docs.directus.io/reference/authentication/';
 	properties: INodeProperties[] = [
 		{
