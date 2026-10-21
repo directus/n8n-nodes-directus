@@ -42,7 +42,7 @@ export class Directus implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'Directus',
 		name: 'directus',
-		icon: 'file:directus.svg',
+		icon: { light: 'file:directus.svg', dark: 'file:directus-dark.svg' },
 		group: ['output'],
 		version: 1,
 		subtitle: '={{$parameter["operation"] + ": " + $parameter["resource"]}}',
